@@ -36,14 +36,14 @@ class ShelterAppTests(unittest.TestCase):
         self.assertIn('残り空き人数が多い順', html)
         self.assertNotIn('残り空き人数が少ない順', html)
 
-    def test_full_shelters_are_hidden_from_search_results(self):
+    def test_full_shelters_are_not_hidden_from_search_results(self):
         shelter_app.shelters[0] = {"id": 1, "name": "A", "capacity": 10, "current": 10}
 
         response = self.client.get('/search_results?sort=remaining_desc')
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.get_shelter_names(html), ['B', 'C'])
+        self.assertEqual(self.get_shelter_names(html), ['B', 'C', 'A'])
 
     def test_shelter_register_accepts_capacity_and_current(self):
         with self.client.session_transaction() as session:

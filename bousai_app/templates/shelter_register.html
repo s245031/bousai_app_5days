@@ -10,7 +10,7 @@
 {% endif %}
 
 {% if error %}
-  <p>{{ message }}</p>
+  <p style="color: #c43d31; font-weight: 700;">{{ message }}</p>
 {% endif %}
 
 <form method="POST">
@@ -29,21 +29,12 @@
   <p><button type="submit">登録</button></p>
 </form>
 
-<h3>登録済み避難所一覧</h3>
-{% if shelters %}
-  <ul>
-    {% for shelter in shelters %}
-    <li>
-      {{ shelter.name }}
-      （受け入れ可能人数: {{ shelter.capacity|default(0) }}、現在の受け入れ人数: {{ shelter.current|default(0) }}、残り: {{ (shelter.capacity|default(0) - shelter.current|default(0)) if shelter.capacity is defined else 0 }}）
-      <a href="/shelter_edit/{{ shelter.id }}">編集</a>
-      <form method="POST" action="/shelter_delete/{{ shelter.id }}" style="display:inline;">
-        <button type="submit">削除</button>
-      </form>
-    </li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p>登録済みの避難所はありません。</p>
-{% endif %}
+<div style="margin-top: 32px;">
+  <h3>すぐ移動</h3>
+  <p style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px;">
+    <a href="/" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #0d5c96; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">ホーム</a>
+    <a href="/shelter_search" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #2cac72; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">避難所検索</a>
+    <a href="/board" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #4b5563; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">発信画面</a>
+  </p>
+</div>
 {% endblock %}

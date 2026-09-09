@@ -164,7 +164,7 @@ def remaining_capacity(shelter):
     return max(capacity - current, 0)
 
 
-def filter_shelters(district=None, sort=None, only_available=True):
+def filter_shelters(district=None, sort=None, only_available=False):
     """district 指定があれば一致する避難所のみ、必要なら並び替えする"""
     results = [s for s in shelters if not district or s.get('district') == district]
 
@@ -403,7 +403,7 @@ def shelter_register():
                 'shelter_register.html',
                 shelters=shelters,
                 error=True,
-                message='現在の受け入れ人数は受け入れ可能人数以下にしてください。'
+                message='受け入れ人数が受け入れ可能人数を上回っています。'
             )
 
         new_id = max((s.get('id', 0) for s in shelters), default=0) + 1
@@ -485,7 +485,7 @@ def shelter_edit(shelter_id):
                 'shelter_edit.html',
                 shelter=shelter,
                 error=True,
-                message='現在の受け入れ人数は受け入れ可能人数以下にしてください。'
+                message='受け入れ人数が受け入れ可能人数を上回っています。'
             )
 
         shelter['name'] = shelter_name
@@ -517,15 +517,15 @@ def board():
 # 検索結果ページ：templates/search_results.html を返す
 @app.route('/search_results')
 def search_results():
-    sort = request.args.get('sort', 'remaining_asc')
-    results = filter_shelters(request.args.get('district'), sort=sort, only_available=True)
+    sort = request.args.get('sort', 'remaining_desc')
+    results = filter_shelters(request.args.get('district'), sort=sort, only_available=False)
     return render_template('search_results.html', results=results, sort=sort)
 
 # JSON API：/shelters?district=地区名
 @app.route('/shelters', methods=['GET'])
 def get_shelters():
-    sort = request.args.get('sort', 'remaining_asc')
-    results = filter_shelters(request.args.get('district'), sort=sort, only_available=True)
+    sort = request.args.get('sort', 'remaining_desc')
+    results = filter_shelters(request.args.get('district'), sort=sort, only_available=False)
 
     if not results:
         # 見つからなければエラー JSON を返す
