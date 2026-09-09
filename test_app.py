@@ -1,0 +1,94 @@
+import re
+import unittest
+
+import app as shelter_app
+
+
+class ShelterAppTests(unittest.TestCase):
+    def setUp(self):
+        self.original_shelters = [dict(item) for item in shelter_app.shelters]
+        shelter_app.shelters[:] = [
+            {"id": 1, "name": "A", "capacity": 10, "current": 8},
+            {"id": 2, "name": "B", "capacity": 20, "current": 0},
+            {"id": 3, "name": "C", "capacity": 15, "current": 4},
+        ]
+        self.client = shelter_app.app.test_client()
+
+    def tearDown(self):
+        shelter_app.shelters[:] = self.original_shelters
+
+    def get_shelter_names(self, html):
+        rows = re.findall(r'<tr>\s*<td>(.*?)</td>', html, flags=re.DOTALL)
+        return [row.strip() for row in rows]
+
+    def test_search_results_sort_by_remaining_capacity_desc(self):
+        response = self.client.get('/search_results?sort=remaining_desc')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.get_shelter_names(html), ['B', 'C', 'A'])
+
+    def test_shelter_search_page_has_only_remaining_desc_link(self):
+        response = self.client.get('/shelter_search')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('残り空き人数が多い順', html)
+        self.assertNotIn('残り空き人数が少ない順', html)
+
+    def test_full_shelters_are_hidden_from_search_results(self):
+        shelter_app.shelters[0] = {"id": 1, "name": "A", "capacity": 10, "current": 10}
+
+        response = self.client.get('/search_results?sort=remaining_desc')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.get_shelter_names(html), ['B', 'C'])
+
+    def test_shelter_register_accepts_capacity_and_current(self):
+        with self.client.session_transaction() as session:
+            session['logged_in'] = True
+
+        response = self.client.post(
+            '/shelter_register',
+            data={
+                'name': 'D',
+                'capacity': '13',
+                'current': '5',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('D', response.get_data(as_text=True))
+        self.assertEqual(shelter_app.shelters[-1]['capacity'], 13)
+        self.assertEqual(shelter_app.shelters[-1]['current'], 5)
+
+    def test_shelter_register_does_not_show_registered_list(self):
+        with self.client.session_transaction() as session:
+            session['logged_in'] = True
+
+        response = self.client.get('/shelter_register')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('登録済み避難所一覧', html)
+
+    def test_shelter_register_warns_when_current_exceeds_capacity(self):
+        with self.client.session_transaction() as session:
+            session['logged_in'] = True
+
+        response = self.client.post(
+            '/shelter_register',
+            data={
+                'name': 'D',
+                'capacity': '10',
+                'current': '11',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('受け入れ人数が受け入れ可能人数を上回っています。', response.get_data(as_text=True))
+
+
+if __name__ == '__main__':
+    unittest.main()

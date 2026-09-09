@@ -4,11 +4,26 @@
 <h2>検索結果</h2>
 
 {% if results %}
-  <ul>
-    {% for shelter in results %}
-    <li>{{ shelter.name }}</li>
-    {% endfor %}
-  </ul>
+  <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 900px;">
+    <thead>
+      <tr>
+        <th>避難所名</th>
+        <th>受け入れ可能人数</th>
+        <th>現在の受け入れ人数</th>
+        <th>残り空き人数</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for shelter in results %}
+      <tr>
+        <td>{{ shelter.name }}</td>
+        <td>{{ shelter.capacity|default(0) }}人</td>
+        <td>{{ shelter.current|default(0) }}人</td>
+        <td>{{ (shelter.capacity|default(0) - shelter.current|default(0)) if shelter.capacity is defined else 0 }}人</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
 {% else %}
   <p>該当する避難所が見つかりませんでした</p>
 {% endif %}

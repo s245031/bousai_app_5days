@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>避難所情報編集</h2>
+<p>避難所の情報を更新します。</p>
+
+{% if error %}
+  <p>{{ message }}</p>
+{% endif %}
+
+<form method="POST">
+  <p>
+    <label for="name">避難所名</label><br>
+    <input type="text" id="name" name="name" value="{{ shelter.name }}">
+  </p>
+  <p>
+    <label for="capacity">受け入れ可能人数</label><br>
+    <input type="number" id="capacity" name="capacity" min="0" value="{{ shelter.capacity|default(0) }}">
+  </p>
+  <p>
+    <label for="current">現在の受け入れ人数</label><br>
+    <input type="number" id="current" name="current" min="0" value="{{ shelter.current|default(0) }}">
+  </p>
+  <p><button type="submit">更新</button></p>
+</form>
+
+<p>
+  <a href="/shelter_register">避難所登録へ戻る</a>
+</p>
+{% endblock %}

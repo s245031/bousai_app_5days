@@ -1,22 +1,26 @@
 [
   {
     "id": 1,
-    "name": "御所見小学校"
+    "name": "A",
+    "capacity": 10,
+    "current": 8
   },
   {
     "id": 2,
-    "name": "片瀬小学校"
+    "name": "B",
+    "capacity": 20,
+    "current": 0
   },
   {
-    "id": 5,
-    "name": "鵠洋小学校"
+    "id": 3,
+    "name": "C",
+    "capacity": 15,
+    "current": 4
   },
   {
-    "id": 6,
-    "name": "青森小学校"
-  },
-  {
-    "id": 7,
-    "name": "唐下"
+    "id": 4,
+    "name": "D",
+    "capacity": 13,
+    "current": 5
   }
 ]

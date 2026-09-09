@@ -18,6 +18,32 @@
     <label for="name">避難所名（必須）</label><br>
     <input type="text" id="name" name="name">
   </p>
+  <p>
+    <label for="capacity">受け入れ可能人数</label><br>
+    <input type="number" id="capacity" name="capacity" min="0" value="0">
+  </p>
+  <p>
+    <label for="current">現在の受け入れ人数</label><br>
+    <input type="number" id="current" name="current" min="0" value="0">
+  </p>
   <p><button type="submit">登録</button></p>
 </form>
+
+<h3>登録済み避難所一覧</h3>
+{% if shelters %}
+  <ul>
+    {% for shelter in shelters %}
+    <li>
+      {{ shelter.name }}
+      （受け入れ可能人数: {{ shelter.capacity|default(0) }}、現在の受け入れ人数: {{ shelter.current|default(0) }}、残り: {{ (shelter.capacity|default(0) - shelter.current|default(0)) if shelter.capacity is defined else 0 }}）
+      <a href="/shelter_edit/{{ shelter.id }}">編集</a>
+      <form method="POST" action="/shelter_delete/{{ shelter.id }}" style="display:inline;">
+        <button type="submit">削除</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>登録済みの避難所はありません。</p>
+{% endif %}
 {% endblock %}

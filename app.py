@@ -149,9 +149,46 @@ def format_report_time(iso_str):
         return iso_str
 
 
-def filter_shelters(district=None):
-    """district 指定があれば一致する避難所のみ、なければ全件を返す"""
-    return [s for s in shelters if not district or s.get('district') == district]
+def to_int(value, default=0):
+    """文字列・数値を安全に int に変換する"""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def remaining_capacity(shelter):
+    """残り受け入れ人数を計算する"""
+    capacity = to_int(shelter.get('capacity'), 0)
+    current = to_int(shelter.get('current'), 0)
+    return max(capacity - current, 0)
+
+
+def filter_shelters(district=None, sort=None, only_available=True):
+    """district 指定があれば一致する避難所のみ、必要なら並び替えする"""
+    results = [s for s in shelters if not district or s.get('district') == district]
+
+    if only_available:
+        results = [s for s in results if remaining_capacity(s) > 0]
+
+    if sort == 'current_asc':
+        return sorted(results, key=lambda s: (to_int(s.get('current'), 0), s.get('name', '')))
+    if sort == 'current_desc':
+        return sorted(results, key=lambda s: (-to_int(s.get('current'), 0), s.get('name', '')))
+    if sort == 'remaining_asc':
+        return sorted(results, key=lambda s: (remaining_capacity(s), s.get('name', '')))
+    if sort == 'remaining_desc':
+        return sorted(results, key=lambda s: (-remaining_capacity(s), s.get('name', '')))
+
+    return results
+
+
+def get_shelter_by_id(shelter_id):
+    """IDから避難所を取得する"""
+    for shelter in shelters:
+        if shelter.get('id') == shelter_id:
+            return shelter
+    return None
 
 
 def parse_area_warnings(warning_data):
@@ -326,28 +363,138 @@ def logout():
 def shelter_register():
     if request.method == 'POST':
         shelter_name = request.form.get('name', '').strip()
+        capacity = request.form.get('capacity', '').strip()
+        current = request.form.get('current', '').strip()
 
         if not shelter_name:
             return render_template(
                 'shelter_register.html',
+                shelters=shelters,
                 error=True,
                 message='避難所名を入力してください。'
+            )
+
+        if capacity == '':
+            capacity = 0
+        if current == '':
+            current = 0
+
+        try:
+            capacity = int(capacity)
+            current = int(current)
+        except ValueError:
+            return render_template(
+                'shelter_register.html',
+                shelters=shelters,
+                error=True,
+                message='受け入れ可能人数と現在の受け入れ人数は整数で入力してください。'
+            )
+
+        if capacity < 0 or current < 0:
+            return render_template(
+                'shelter_register.html',
+                shelters=shelters,
+                error=True,
+                message='人数は0以上で入力してください。'
+            )
+
+        if capacity and current > capacity:
+            return render_template(
+                'shelter_register.html',
+                shelters=shelters,
+                error=True,
+                message='現在の受け入れ人数は受け入れ可能人数以下にしてください。'
             )
 
         new_id = max((s.get('id', 0) for s in shelters), default=0) + 1
         shelters.append({
             'id': new_id,
-            'name': shelter_name
+            'name': shelter_name,
+            'capacity': capacity,
+            'current': current
         })
         save_shelters()
 
         return render_template(
             'shelter_register.html',
+            shelters=shelters,
             success=True,
             message=f'避難所「{shelter_name}」を登録しました。'
         )
 
-    return render_template('shelter_register.html')
+    return render_template('shelter_register.html', shelters=shelters)
+
+
+@app.route('/shelter_delete/<int:shelter_id>', methods=['POST'])
+@login_required
+def shelter_delete(shelter_id):
+    shelter = get_shelter_by_id(shelter_id)
+    if shelter:
+        shelters[:] = [s for s in shelters if s.get('id') != shelter_id]
+        save_shelters()
+
+    return redirect(url_for('shelter_register'))
+
+
+@app.route('/shelter_edit/<int:shelter_id>', methods=['GET', 'POST'])
+@login_required
+def shelter_edit(shelter_id):
+    shelter = get_shelter_by_id(shelter_id)
+    if not shelter:
+        return redirect(url_for('shelter_register'))
+
+    if request.method == 'POST':
+        shelter_name = request.form.get('name', '').strip()
+        capacity = request.form.get('capacity', '').strip()
+        current = request.form.get('current', '').strip()
+
+        if not shelter_name:
+            return render_template(
+                'shelter_edit.html',
+                shelter=shelter,
+                error=True,
+                message='避難所名を入力してください。'
+            )
+
+        if capacity == '':
+            capacity = 0
+        if current == '':
+            current = 0
+
+        try:
+            capacity = int(capacity)
+            current = int(current)
+        except ValueError:
+            return render_template(
+                'shelter_edit.html',
+                shelter=shelter,
+                error=True,
+                message='受け入れ可能人数と現在の受け入れ人数は整数で入力してください。'
+            )
+
+        if capacity < 0 or current < 0:
+            return render_template(
+                'shelter_edit.html',
+                shelter=shelter,
+                error=True,
+                message='人数は0以上で入力してください。'
+            )
+
+        if capacity and current > capacity:
+            return render_template(
+                'shelter_edit.html',
+                shelter=shelter,
+                error=True,
+                message='現在の受け入れ人数は受け入れ可能人数以下にしてください。'
+            )
+
+        shelter['name'] = shelter_name
+        shelter['capacity'] = capacity
+        shelter['current'] = current
+        save_shelters()
+        return redirect(url_for('shelter_register'))
+
+    return render_template('shelter_edit.html', shelter=shelter)
 
 # 避難所検索ページ
 @app.route('/shelter_search')
@@ -370,13 +517,15 @@ def board():
 # 検索結果ページ：templates/search_results.html を返す
 @app.route('/search_results')
 def search_results():
-    results = filter_shelters(request.args.get('district'))
-    return render_template('search_results.html', results=results)
+    sort = request.args.get('sort', 'remaining_asc')
+    results = filter_shelters(request.args.get('district'), sort=sort, only_available=True)
+    return render_template('search_results.html', results=results, sort=sort)
 
 # JSON API：/shelters?district=地区名
 @app.route('/shelters', methods=['GET'])
 def get_shelters():
-    results = filter_shelters(request.args.get('district'))
+    sort = request.args.get('sort', 'remaining_asc')
+    results = filter_shelters(request.args.get('district'), sort=sort, only_available=True)
 
     if not results:
         # 見つからなければエラー JSON を返す
