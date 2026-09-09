@@ -3,6 +3,7 @@ from urllib.parse import urlparse, urljoin
 from functools import wraps
 import json
 import os
+import random
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -94,6 +95,31 @@ def load_json(path, default):
 
 shelters = load_json(DATA_FILE, [])
 instructions = load_json(INSTRUCTIONS_FILE, [])
+
+
+def get_default_shelter_coordinates(shelter=None, index=0):
+    """地図表示用の適当な座標を生成する。初期表示の範囲内に収まるように少しだけ散らばらせる。"""
+    shelter_id = shelter.get('id') if shelter else None
+    base_index = shelter_id if shelter_id is not None else index
+
+    # 既存データには一貫した位置を与えつつ、初期地図範囲内で少しだけ散らばらせる
+    rng = random.Random(base_index + 100)
+    lat = 40.8230 + rng.uniform(-0.0060, 0.0060)
+    lng = 140.7450 + rng.uniform(-0.0100, 0.0100)
+
+    return round(lat, 4), round(lng, 4)
+
+
+def normalize_shelter_coordinates():
+    """避難所データに座標がない場合のみ適当な座標を補完する"""
+    for index, shelter in enumerate(shelters):
+        if shelter.get('lat') is None or shelter.get('lng') is None:
+            shelter['lat'], shelter['lng'] = get_default_shelter_coordinates(shelter, index)
+    return shelters
+
+
+shelters = normalize_shelter_coordinates()
+
 
 def save_instructions():
     """指示ボードのデータをファイルに保存する"""
@@ -407,11 +433,14 @@ def shelter_register():
             )
 
         new_id = max((s.get('id', 0) for s in shelters), default=0) + 1
+        lat, lng = get_default_shelter_coordinates({'id': new_id}, len(shelters))
         shelters.append({
             'id': new_id,
             'name': shelter_name,
             'capacity': capacity,
-            'current': current
+            'current': current,
+            'lat': lat,
+            'lng': lng
         })
         save_shelters()
 
@@ -508,8 +537,8 @@ def all_shelters():
 
 
 # 指示ボード：住民向けの指示を一覧で確認する
+# 住民向けの情報なのでログインなしでも閲覧できるようにする
 @app.route('/board')
-@login_required
 def board():
     resident_instructions = [i for i in instructions if i.get('target') == '住民']
     return render_template('board.html', instructions=resident_instructions)
@@ -517,6 +546,7 @@ def board():
 # 検索結果ページ：templates/search_results.html を返す
 @app.route('/search_results')
 def search_results():
+    normalize_shelter_coordinates()
     sort = request.args.get('sort', 'remaining_desc')
     results = filter_shelters(request.args.get('district'), sort=sort, only_available=False)
     return render_template('search_results.html', results=results, sort=sort)

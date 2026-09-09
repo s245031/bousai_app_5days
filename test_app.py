@@ -18,7 +18,7 @@ class ShelterAppTests(unittest.TestCase):
         shelter_app.shelters[:] = self.original_shelters
 
     def get_shelter_names(self, html):
-        rows = re.findall(r'<tr>\s*<td>(.*?)</td>', html, flags=re.DOTALL)
+        rows = re.findall(r'<tr[^>]*>\s*<td[^>]*>(.*?)</td>', html, flags=re.DOTALL)
         return [row.strip() for row in rows]
 
     def test_search_results_sort_by_remaining_capacity_desc(self):
@@ -45,6 +45,24 @@ class ShelterAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.get_shelter_names(html), ['B', 'C', 'A'])
 
+    def test_search_results_show_remaining_rate_and_row_colors(self):
+        response = self.client.get('/search_results?sort=remaining_desc')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('残り空き率', html)
+        self.assertIn('20%', html)
+        self.assertIn('100%', html)
+        self.assertIn('73%', html)
+
+    def test_search_results_page_has_map_section(self):
+        response = self.client.get('/search_results?sort=remaining_desc')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('shelterMap', html)
+        self.assertIn('leaflet', html)
+
     def test_shelter_register_accepts_capacity_and_current(self):
         with self.client.session_transaction() as session:
             session['logged_in'] = True
@@ -62,6 +80,24 @@ class ShelterAppTests(unittest.TestCase):
         self.assertIn('D', response.get_data(as_text=True))
         self.assertEqual(shelter_app.shelters[-1]['capacity'], 13)
         self.assertEqual(shelter_app.shelters[-1]['current'], 5)
+
+    def test_shelter_register_assigns_default_coordinates(self):
+        with self.client.session_transaction() as session:
+            session['logged_in'] = True
+
+        self.client.post(
+            '/shelter_register',
+            data={
+                'name': 'E',
+                'capacity': '9',
+                'current': '1',
+            },
+        )
+
+        self.assertIn('lat', shelter_app.shelters[-1])
+        self.assertIn('lng', shelter_app.shelters[-1])
+        self.assertIsInstance(shelter_app.shelters[-1]['lat'], float)
+        self.assertIsInstance(shelter_app.shelters[-1]['lng'], float)
 
     def test_shelter_register_does_not_show_registered_list(self):
         with self.client.session_transaction() as session:
@@ -88,6 +124,14 @@ class ShelterAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('受け入れ人数が受け入れ可能人数を上回っています。', response.get_data(as_text=True))
+
+    def test_board_page_is_public(self):
+        response = self.client.get('/board')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('発信ボード', html)
+        self.assertIn('B避難所へ避難してください', html)
 
 
 if __name__ == '__main__':

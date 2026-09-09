@@ -1,35 +1,161 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+  .results-layout {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+  }
+
+  .table-panel,
+  .map-panel {
+    flex: 1 1 50%;
+    min-width: 0;
+  }
+
+  .table-panel {
+    overflow-x: auto;
+  }
+
+  .map-panel {
+    min-height: 520px;
+    border: 1px solid #d9dde4;
+    border-radius: 18px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #dff1f9 0%, #c7e7f4 100%);
+  }
+
+  #shelterMap {
+    width: 100%;
+    height: 520px;
+    background: #d8edf7;
+  }
+
+  .map-legend {
+    margin-top: 12px;
+    font-size: 0.95rem;
+    color: #4b5563;
+  }
+
+  @media (max-width: 900px) {
+    .results-layout {
+      display: block;
+    }
+
+    .table-panel,
+    .map-panel {
+      width: 100%;
+      margin-bottom: 20px;
+    }
+  }
+</style>
+
 <h2>検索結果</h2>
 
 {% if results %}
-  <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 900px;">
-    <thead>
-      <tr>
-        <th>避難所名</th>
-        <th>受け入れ可能人数</th>
-        <th>現在の受け入れ人数</th>
-        <th>残り空き人数</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for shelter in results %}
-      <tr>
-        <td>{{ shelter.name }}</td>
-        <td>{{ shelter.capacity|default(0) }}人</td>
-        <td>{{ shelter.current|default(0) }}人</td>
-        <td>{{ (shelter.capacity|default(0) - shelter.current|default(0)) if shelter.capacity is defined else 0 }}人</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="results-layout">
+    <div class="table-panel">
+      <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 900px;">
+        <thead>
+          <tr>
+            <th>避難所名</th>
+            <th>受け入れ可能人数</th>
+            <th>現在の受け入れ人数</th>
+            <th>残り空き人数</th>
+            <th>残り空き率</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for shelter in results %}
+            {% set capacity = shelter.capacity|default(0) %}
+            {% set current = shelter.current|default(0) %}
+            {% set remaining = capacity - current %}
+            {% set rate = ((remaining / capacity) * 100)|int if capacity else 0 %}
+            {% set row_color = '#f7b7b5' if rate <= 30 else '#f7e7a8' if rate <= 70 else '#bfe7c7' %}
+          <tr>
+            <td style="background-color: {{ row_color }};">{{ shelter.name }}</td>
+            <td style="background-color: {{ row_color }};">{{ capacity }}人</td>
+            <td style="background-color: {{ row_color }};">{{ current }}人</td>
+            <td style="background-color: {{ row_color }};">{{ remaining }}人</td>
+            <td style="background-color: {{ row_color }};">{{ rate }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div style="margin-top: 20px;">
+        <p style="display: flex; flex-wrap: wrap; gap: 12px; margin: 0;">
+          <a href="/shelter_search" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #2cac72; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">避難所検索</a>
+          <a href="/" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #0d5c96; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">トップページへ戻る</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="map-panel">
+      <div id="shelterMap" aria-label="避難所マップ"></div>
+    </div>
+  </div>
+
+  <div class="map-legend" style="margin-top: 20px;">マーカーにカーソルを合わせると避難所名が表示され、クリックすると詳細が確認できます。</div>
 {% else %}
   <p>該当する避難所が見つかりませんでした</p>
 {% endif %}
 
-<p>
-  <a href="/shelter_search">検索画面に戻る</a> |
-  <a href="/">トップページへ戻る</a>
-</p>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const sheltersData = {{ results | tojson | safe }};
+
+    if (!document.getElementById('shelterMap')) {
+      return;
+    }
+
+    const map = L.map('shelterMap').setView([40.823, 140.745], 10.8);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const markers = sheltersData.filter(function (shelter) {
+      return shelter.lat !== undefined && shelter.lng !== undefined;
+    });
+
+    markers.forEach(function (shelter) {
+      const capacity = Number(shelter.capacity || 0);
+      const current = Number(shelter.current || 0);
+      const remaining = Math.max(capacity - current, 0);
+      const rate = capacity ? Math.round((remaining / capacity) * 100) : 0;
+
+      let fillColor = '#2e7d32';
+      if (rate <= 30) {
+        fillColor = '#e53935';
+      } else if (rate <= 70) {
+        fillColor = '#f4b400';
+      }
+
+      const marker = L.circleMarker([shelter.lat, shelter.lng], {
+        radius: 7,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: fillColor,
+        fillOpacity: 0.95
+      }).addTo(map);
+
+      marker.bindTooltip(shelter.name, {
+        direction: 'top',
+        opacity: 0.95
+      });
+
+      marker.bindPopup(
+        '<strong>' + shelter.name + '</strong><br>' +
+        '受け入れ可能人数: ' + capacity + '人<br>' +
+        '現在の受け入れ人数: ' + current + '人<br>' +
+        '残り空き率: ' + rate + '%'
+      );
+    });
+  });
+</script>
 {% endblock %}
