@@ -4,31 +4,281 @@
   <meta charset="utf-8">
   <title>{% block title %}防災アプリ{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg: #edf0f3;
+      --panel: #f6f8fb;
+      --line: #d9dde4;
+      --text: #1b2a39;
+      --muted: #64717d;
+      --primary: #0d5c96;
+      --primary-soft: #eaf3fb;
+      --success: #2cac72;
+      --success-soft: #e7f9ee;
+      --shadow: rgba(20, 54, 86, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    a { color: inherit; }
+
+    .app-header {
+      background: linear-gradient(180deg, #0a5d99 0%, #0a4f88 100%);
+      box-shadow: 0 4px 16px rgba(8, 46, 78, 0.12);
+    }
+
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: 76px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      font-size: clamp(1.8rem, 2vw, 2.25rem);
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      color: #f4f8fc;
+      line-height: 1;
+    }
+
+    .menu-button {
+      width: 42px;
+      height: 42px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 1.8rem;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .main-nav {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 14px;
+      display: none;
+      justify-content: flex-end;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .main-nav.open {
+      display: flex;
+    }
+
+    .main-nav a {
+      color: rgba(255, 255, 255, 0.92);
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    .page-shell {
+      max-width: 1100px;
+      margin: 30px auto 50px;
+      padding: 0 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 8px 18px var(--shadow);
+      padding: 20px 22px;
+    }
+
+    .home-page {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 2px 16px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .title-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      font-size: 1.2rem;
+      color: var(--primary);
+      line-height: 1;
+    }
+
+    .map-wrap {
+      background: linear-gradient(180deg, #dff1f9 0%, #c7e7f4 100%);
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid rgba(13, 90, 144, 0.14);
+      min-height: 480px;
+      position: relative;
+    }
+
+    #shelterMap {
+      width: 100%;
+      height: 480px;
+      background: #d8edf7;
+    }
+
+    .weather-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+      margin-bottom: 18px;
+    }
+
+    .refresh-button {
+      border: 1px solid rgba(42, 172, 113, 0.4);
+      background: var(--success-soft);
+      color: var(--success);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #weatherContent {
+      color: var(--text);
+      font-size: 1.05rem;
+    }
+
+    .weather-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding: 8px 0;
+      color: var(--muted);
+    }
+
+    .weather-safe {
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--success);
+      background: var(--success);
+      color: #ffffff;
+      font-size: 1rem;
+      line-height: 1;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .status-tick {
+      color: var(--success);
+      font-size: 1.3rem;
+      line-height: 1;
+    }
+
+    .weather-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      padding: 8px 0;
+      font-size: 1rem;
+    }
+
+    .weather-row .icon {
+      width: 20px;
+      text-align: center;
+      color: var(--primary);
+    }
+
+    .weather-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .loading {
+      color: var(--muted);
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .header-inner,
+      .main-nav,
+      .page-shell {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .weather-header {
+        display: block;
+      }
+
+      .refresh-button {
+        margin-top: 12px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <!-- ヘッダー -->
-  <h1>防災アプリ</h1>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">防災アプリ</div>
+      <button class="menu-button" type="button" aria-label="メニュー" onclick="document.getElementById('mainNav').classList.toggle('open')">☰</button>
+    </div>
 
-  <!-- ナビゲーション -->
-  <nav>
-    <a href="/">ホーム</a> |
-    <a href="/shelter_search">避難所検索</a> |
-    <a href="/shelter_register">避難所登録</a> |
-    <a href="/board">指示・発信ボード</a>
-    ｜
-    {% if session.logged_in %}
-      ログイン中{% if session.username %}（{{ session.username }}）{% endif %}
-      <a href="/logout">ログアウト</a>
-    {% else %}
-      未ログイン
-      <a href="/login">ログイン</a>
-    {% endif %}
-  </nav>
-  <hr>
+    <nav id="mainNav" class="main-nav" aria-label="メインメニュー">
+      <a href="/">ホーム</a>
+      <a href="/shelter_search">避難所検索</a>
+      <a href="/shelter_register">避難所登録</a>
+      <a href="/board">指示・発信ボード</a>
+      {% if session.logged_in %}
+        <a href="/logout">ログアウト</a>
+      {% else %}
+        <a href="/login">ログイン</a>
+      {% endif %}
+    </nav>
+  </header>
 
-  <main>
-    <!-- ここに子テンプレートの content が入る -->
-    {% block content %}{% endblock %}
-  </main>
+  <div class="page-shell">
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>
