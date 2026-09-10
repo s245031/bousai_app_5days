@@ -88,16 +88,124 @@
     gap: 14px;
   }
 
-  .icon-preview {
+  .disaster-pin-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 16px;
+    border: 2px dashed #7aa8d9;
+    background: #edf6ff;
+    color: #0d5c96;
+    font-weight: 700;
+    min-height: 140px;
+    box-sizing: border-box;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .disaster-pin-preview__frame {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 56px;
-    border-radius: 12px;
-    border: 1px dashed #7aa8d9;
-    background: #edf6ff;
-    font-size: 2rem;
-    color: #0d5c96;
+    width: 92px;
+    height: 92px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #f8fbff 0%, #ddeeff 100%);
+    border: 1px solid #b8d6f3;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+
+  .disaster-pin-preview__pin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--pin-size, 30px);
+    height: var(--pin-size, 30px);
+    border-radius: 50% 50% 50% 0;
+    border: 2px solid #ffffff;
+    background: var(--pin-color, #0d5c96);
+    transform: rotate(-45deg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    position: relative;
+    flex-shrink: 0;
+    overflow: hidden;
+    font-size: clamp(0.78rem, 0.5vw + 0.55rem, 1rem);
+    line-height: 1;
+  }
+
+  .disaster-pin-preview__pin::before {
+    content: var(--pin-icon, '•');
+    display: inline-block;
+    transform: rotate(45deg);
+    font-weight: 900;
+    color: #ffffff;
+  }
+
+  .disaster-pin-preview__label {
+    font-size: 0.88rem;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .disaster-pin-preview.is-dragging {
+    opacity: 0.7;
+  }
+
+  .disaster-ghost-pin {
+    position: fixed;
+    left: 0;
+    top: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--pin-size, 30px);
+    height: var(--pin-size, 30px);
+    border-radius: 50% 50% 50% 0;
+    border: 2px solid #ffffff;
+    background: var(--pin-color, #0d5c96);
+    transform: rotate(-45deg) translate(-50%, -50%);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+    pointer-events: none;
+    z-index: 2000;
+    opacity: 0.96;
+  }
+
+  .disaster-ghost-pin::before {
+    content: var(--pin-icon, '•');
+    display: inline-block;
+    transform: rotate(45deg);
+    font-weight: 900;
+    color: #ffffff;
+    font-size: clamp(0.75rem, 0.5vw + 0.55rem, 1rem);
+  }
+
+  .disaster-ghost-pin.is-over-map {
+    box-shadow: 0 0 0 4px rgba(35, 123, 214, 0.22), 0 4px 10px rgba(0, 0, 0, 0.18);
+  }
+
+  .disaster-marker-shape {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50% 50% 50% 0;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transform: rotate(-45deg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .disaster-marker-inner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(45deg);
+    color: #ffffff;
+    line-height: 1;
+    font-weight: 900;
   }
 
   .scale-note {
@@ -231,26 +339,19 @@
         <div class="form-field">
           <label for="disasterName">災害情報</label>
           <select id="disasterName" name="disasterName" aria-label="災害情報を選択">
-            <option value="地震">地震</option>
-            <option value="火災">火災</option>
-            <option value="洪水">洪水</option>
-            <option value="津波">津波</option>
-            <option value="土砂災害">土砂災害</option>
-            <option value="避難誘導">避難誘導</option>
+            <option value="河川洪水">🌊 河川洪水</option>
+            <option value="土砂災害">⛰ 土砂災害</option>
+            <option value="道路冠水">🚗 道路冠水</option>
+            <option value="道路寸断">🚧 道路寸断</option>
+            <option value="津波">🌊 津波</option>
+            <option value="獣害">🐾 獣害</option>
           </select>
-        </div>
-
-        <div class="form-field">
-          <label for="icon">災害アイコン</label>
-          <select id="icon" name="icon" aria-label="災害アイコンを選択">
-            <option value="⚠">⚠</option>
-            <option value="〽">〽</option>
-            <option value="🌊">🌊</option>
-            <option value="🔥">🔥</option>
-            <option value="⛑">⛑</option>
-            <option value="📍">📍</option>
-          </select>
-          <div class="icon-preview" id="iconPreview" aria-live="polite">⚠</div>
+          <div class="disaster-pin-preview disaster-pin-drop-zone" id="disasterPinPreview" aria-live="polite">
+            <span class="disaster-pin-preview__frame" aria-hidden="true">
+              <span class="disaster-pin-preview__pin" aria-hidden="true"></span>
+            </span>
+            <span class="disaster-pin-preview__label" id="disasterPinLabel">河川洪水</span>
+          </div>
         </div>
 
         <div class="form-field">
@@ -316,9 +417,9 @@
     const savedMarkers = {{ disaster_markers | tojson | safe }};
     const scaleSelect = document.getElementById('scale');
     const scaleNote = document.getElementById('scaleNote');
-    const iconSelect = document.getElementById('icon');
-    const iconPreview = document.getElementById('iconPreview');
     const disasterNameSelect = document.getElementById('disasterName');
+    const disasterPinPreview = document.getElementById('disasterPinPreview');
+    const disasterPinLabel = document.getElementById('disasterPinLabel');
     const datetimeInput = document.getElementById('datetime');
     const noteInput = document.getElementById('note');
     const deleteModeButton = document.getElementById('deleteModeButton');
@@ -327,7 +428,12 @@
     const initialCenter = [40.8244, 140.7400];
     const initialZoom = 12;
     let deleteMode = false;
-    let draftMarker = null;
+    const stagedMarkers = [];
+    let dragState = {
+      active: false,
+      timerId: null,
+      ghostPin: null
+    };
 
     const map = L.map('boardMap').setView(initialCenter, initialZoom);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -345,20 +451,30 @@
         .replace(/'/g, '&#039;');
     }
 
-    function updateIconPreview() {
-      iconPreview.textContent = iconSelect.value || '⚠';
+    function getDisasterIcon(disasterName) {
+      const iconMap = {
+        '河川洪水':',',
+        '土砂災害': '⛰',
+        '道路冠水': '🚗',
+        '道路寸断': '🚧',
+        '津波': '🌊',
+        '獣害': '🐾'
+      };
+
+      return iconMap[disasterName] || '⚠';
     }
 
-    function updateScaleNote() {
-      const scaleSelected = Boolean(scaleSelect.value);
-      scaleNote.hidden = scaleSelected;
-      if (!scaleSelected && draftMarker) {
-        draftMarker.remove();
-        draftMarker = null;
-      }
-      if (scaleSelected) {
-        ensureDraftMarker();
-      }
+    function getDisasterColor(disasterName) {
+      const colorMap = {
+        '河川洪水': '#1565c0',
+        '土砂災害': '#e65100',
+        '道路冠水': '#f9a825',
+        '道路寸断': '#c2185b',
+        '津波': '#00838f',
+        '獣害': '#6a1b9a'
+      };
+
+      return colorMap[disasterName] || '#0d5c96';
     }
 
     function getScaleColor(scale) {
@@ -369,10 +485,10 @@
     }
 
     function getScaleSize(scale) {
-      if (scale === '小規模') return 26;
-      if (scale === '中規模') return 34;
-      if (scale === '大規模') return 50;
-      return 26;
+      if (scale === '小規模') return 30;
+      if (scale === '中規模') return 38;
+      if (scale === '大規模') return 54;
+      return 30;
     }
 
     function getMarkerSize(scale, zoom) {
@@ -381,10 +497,11 @@
       return Math.round(baseSize * Math.max(0.65, Math.min(1.6, zoomScale)));
     }
 
-    function buildDisasterIcon(scale, zoom) {
+    function buildDisasterIcon(scale, zoom, disasterName) {
       const size = getMarkerSize(scale, zoom);
       const color = getScaleColor(scale);
-      const html = '<span class="disaster-marker-shape" style="width:' + size + 'px;height:' + size + 'px;background:' + color + ';border-color:' + color + ';"></span>';
+      const icon = getDisasterIcon(disasterName || '災害情報');
+      const html = '<span class="disaster-marker-shape" style="width:' + size + 'px;height:' + size + 'px;background:' + color + ';border-color:' + color + ';"><span class="disaster-marker-inner" style="font-size:' + Math.max(12, Math.round(size * 0.5)) + 'px;">' + icon + '</span></span>';
       return L.divIcon({
         className: 'disaster-marker-icon',
         html: html,
@@ -407,22 +524,36 @@
         '</div>';
     }
 
-    function renderSavedMarkers() {
+    function updateDisasterPinPreview() {
+      const selectedDisaster = disasterNameSelect.value || '河川洪水';
+      const scale = scaleSelect.value || '小規模';
+      disasterPinLabel.textContent = selectedDisaster;
+      disasterPinPreview.style.setProperty('--pin-color', getDisasterColor(selectedDisaster));
+      disasterPinPreview.style.setProperty('--pin-icon', `'${getDisasterIcon(selectedDisaster)}'`);
+      disasterPinPreview.style.setProperty('--pin-size', getScaleSize(scale) + 'px');
+      disasterPinPreview.setAttribute('aria-label', '災害ピンのプレビュー: ' + selectedDisaster + '（規模: ' + scale + '）');
+    }
+
+    function updateScaleNote() {
+      const scaleSelected = Boolean(scaleSelect.value);
+      scaleNote.hidden = scaleSelected;
+      updateDisasterPinPreview();
+    }
+
+    function renderMarkers() {
       disasterLayer.clearLayers();
 
-      if (!Array.isArray(savedMarkers)) {
-        return;
-      }
+      const markersToRender = savedMarkers.concat(stagedMarkers);
 
-      savedMarkers.forEach(function (marker) {
+      markersToRender.forEach(function (marker) {
         if (!marker || marker.latitude === undefined || marker.longitude === undefined) {
           return;
         }
 
         const scale = marker.scale || '小規模';
-        const currentIcon = buildDisasterIcon(scale, map.getZoom());
+        const icon = buildDisasterIcon(scale, map.getZoom(), marker.name || marker.icon || '災害情報');
         const markerLayer = L.marker([marker.latitude, marker.longitude], {
-          icon: currentIcon
+          icon: icon
         }).addTo(disasterLayer);
 
         markerLayer.bindPopup(buildPopupHtml(marker));
@@ -433,13 +564,30 @@
             return;
           }
 
-          if (!window.confirm('この災害アイコンを削除しますか？')) {
-            return;
-          }
-
-          deleteMarker(marker.id);
+          removeMarker(marker.id);
         });
       });
+    }
+
+    function removeMarker(markerId) {
+      const stagedIndex = stagedMarkers.findIndex(function (marker) {
+        return String(marker.id) === String(markerId);
+      });
+
+      if (stagedIndex >= 0) {
+        stagedMarkers.splice(stagedIndex, 1);
+        renderMarkers();
+        return;
+      }
+
+      const savedIndex = savedMarkers.findIndex(function (marker) {
+        return String(marker.id) === String(markerId);
+      });
+
+      if (savedIndex >= 0) {
+        savedMarkers.splice(savedIndex, 1);
+        renderMarkers();
+      }
     }
 
     async function reverseGeocode(latlng) {
@@ -471,82 +619,140 @@
       }
     }
 
-    function ensureDraftMarker() {
+    async function placeMarkerOnMap(latlng) {
       if (!scaleSelect.value) {
+        alert('規模を入力してください');
         return;
       }
 
-      if (draftMarker) {
-        draftMarker.setIcon(buildDisasterIcon(scaleSelect.value, map.getZoom()));
-        return;
-      }
+      const address = await reverseGeocode(latlng);
+      const marker = {
+        id: 'draft-' + Date.now() + '-' + Math.random().toString(16).slice(2),
+        latitude: latlng.lat,
+        longitude: latlng.lng,
+        icon: getDisasterIcon(disasterNameSelect.value || '災害情報'),
+        name: disasterNameSelect.value || '災害情報',
+        scale: scaleSelect.value,
+        datetime: datetimeInput.value || '',
+        note: noteInput.value || '',
+        address: address
+      };
 
-      draftMarker = L.marker(map.getCenter(), {
-        draggable: true,
-        icon: buildDisasterIcon(scaleSelect.value, map.getZoom())
-      }).addTo(map);
-
-      draftMarker.on('dragstart', function () {
-        if (!scaleSelect.value) {
-          alert('規模を入力してください');
-          draftMarker.setLatLng(map.getCenter());
-        }
-      });
-
-      draftMarker.on('dragend', async function (event) {
-        const latlng = event.target.getLatLng();
-
-        if (!scaleSelect.value) {
-          alert('規模を入力してください');
-          return;
-        }
-
-        const address = await reverseGeocode(latlng);
-        const payload = {
-          latitude: latlng.lat,
-          longitude: latlng.lng,
-          icon: iconSelect.value || '⚠',
-          name: disasterNameSelect.value || '災害情報',
-          scale: scaleSelect.value,
-          datetime: datetimeInput.value || '',
-          note: noteInput.value || '',
-          address: address
-        };
-
-        try {
-          const response = await fetch('/api/disaster_markers', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-
-          const data = await response.json().catch(function () {
-            return {};
-          });
-
-          if (!response.ok) {
-            throw new Error(data.error || '保存に失敗しました');
-          }
-
-          savedMarkers.push(data);
-          renderSavedMarkers();
-          ensureDraftMarker();
-        } catch (error) {
-          alert(error.message || '保存に失敗しました');
-        }
-      });
+      stagedMarkers.push(marker);
+      renderMarkers();
     }
 
-    async function deleteMarker(markerId) {
+    function clearDragState() {
+      if (dragState.timerId) {
+        window.clearTimeout(dragState.timerId);
+        dragState.timerId = null;
+      }
+
+      if (dragState.ghostPin) {
+        dragState.ghostPin.remove();
+        dragState.ghostPin = null;
+      }
+
+      dragState.active = false;
+      disasterPinPreview.classList.remove('is-dragging');
+    }
+
+    function createGhostPin(event) {
+      const ghostPin = document.createElement('span');
+      ghostPin.className = 'disaster-ghost-pin';
+      ghostPin.style.setProperty('--pin-color', getDisasterColor(disasterNameSelect.value || '河川洪水'));
+      ghostPin.style.setProperty('--pin-icon', `'${getDisasterIcon(disasterNameSelect.value || '河川洪水')}'`);
+      ghostPin.style.setProperty('--pin-size', getScaleSize(scaleSelect.value || '小規模') + 'px');
+      document.body.appendChild(ghostPin);
+      dragState.ghostPin = ghostPin;
+      updateGhostPinPosition(event);
+    }
+
+    function updateGhostPinPosition(event) {
+      if (!dragState.ghostPin) {
+        return;
+      }
+
+      dragState.ghostPin.style.left = event.clientX + 'px';
+      dragState.ghostPin.style.top = event.clientY + 'px';
+
+      const mapRect = map.getContainer().getBoundingClientRect();
+      const insideMap = event.clientX >= mapRect.left && event.clientX <= mapRect.right &&
+        event.clientY >= mapRect.top && event.clientY <= mapRect.bottom;
+      dragState.ghostPin.classList.toggle('is-over-map', insideMap);
+    }
+
+    function startDraggingPreview(event) {
+      dragState.active = true;
+      disasterPinPreview.classList.add('is-dragging');
+      createGhostPin(event);
+    }
+
+    function handlePreviewPointerDown(event) {
+      if (event.button !== undefined && event.button !== 0) {
+        return;
+      }
+
+      if (!scaleSelect.value) {
+        alert('規模を入力してください');
+        return;
+      }
+
+      event.preventDefault();
+      dragState.timerId = window.setTimeout(function () {
+        startDraggingPreview(event);
+      }, 350);
+    }
+
+    function handlePointerMove(event) {
+      if (dragState.active) {
+        updateGhostPinPosition(event);
+      }
+    }
+
+    function finishDrag(event) {
+      if (!dragState.active) {
+        return;
+      }
+
+      const mapRect = map.getContainer().getBoundingClientRect();
+      const insideMap = event.clientX >= mapRect.left && event.clientX <= mapRect.right &&
+        event.clientY >= mapRect.top && event.clientY <= mapRect.bottom;
+
+      clearDragState();
+
+      if (!insideMap) {
+        return;
+      }
+
+      const point = {
+        x: event.clientX - mapRect.left,
+        y: event.clientY - mapRect.top
+      };
+      placeMarkerOnMap(map.containerPointToLatLng([point.x, point.y]));
+    }
+
+    function handlePointerUp(event) {
+      if (dragState.timerId) {
+        window.clearTimeout(dragState.timerId);
+        dragState.timerId = null;
+      }
+
+      if (dragState.active) {
+        finishDrag(event);
+      }
+    }
+
+    async function saveMarkers() {
+      const allMarkers = savedMarkers.concat(stagedMarkers);
+
       try {
         const response = await fetch('/api/disaster_markers', {
-          method: 'DELETE',
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ id: markerId })
+          body: JSON.stringify(allMarkers)
         });
 
         const data = await response.json().catch(function () {
@@ -554,34 +760,31 @@
         });
 
         if (!response.ok) {
-          throw new Error(data.error || '削除に失敗しました');
+          throw new Error(data.error || '保存に失敗しました');
         }
 
-        const index = savedMarkers.findIndex(function (marker) {
-          return Number(marker.id) === Number(markerId);
-        });
-
-        if (index >= 0) {
-          savedMarkers.splice(index, 1);
-        }
-
-        renderSavedMarkers();
+        savedMarkers.splice(0, savedMarkers.length, ...data);
+        stagedMarkers.length = 0;
+        renderMarkers();
+        window.location.href = '/';
       } catch (error) {
-        alert(error.message || '削除に失敗しました');
+        alert(error.message || '保存に失敗しました');
       }
     }
 
-    iconSelect.addEventListener('change', updateIconPreview);
+    disasterNameSelect.addEventListener('change', updateDisasterPinPreview);
     scaleSelect.addEventListener('change', updateScaleNote);
     map.on('zoomend', function () {
-      if (draftMarker) {
-        draftMarker.setIcon(buildDisasterIcon(scaleSelect.value, map.getZoom()));
-      }
-      renderSavedMarkers();
+      renderMarkers();
     });
 
+    disasterPinPreview.addEventListener('pointerdown', handlePreviewPointerDown);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerUp);
+
     confirmButton.addEventListener('click', function () {
-      window.location.href = '/';
+      saveMarkers();
     });
 
     deleteModeButton.addEventListener('click', function () {
@@ -591,9 +794,8 @@
     });
 
     datetimeInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    updateIconPreview();
     updateScaleNote();
-    renderSavedMarkers();
+    renderMarkers();
   });
 </script>
 {% endblock %}

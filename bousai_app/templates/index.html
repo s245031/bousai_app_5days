@@ -55,27 +55,27 @@
 
         <div class="legend-grid">
           <div class="legend-item">
-            <span class="legend-pin" aria-label="河川洪水" style="--pin-color: #1565c0;"></span>
+            <span class="legend-pin" aria-label="河川洪水" style="--pin-color: #1565c0; --pin-icon: '🌊';"></span>
             <span>河川洪水</span>
           </div>
           <div class="legend-item">
-            <span class="legend-pin" aria-label="土砂災害" style="--pin-color: #e65100;"></span>
+            <span class="legend-pin" aria-label="土砂災害" style="--pin-color: #e65100; --pin-icon: '⛰';"></span>
             <span>土砂災害</span>
           </div>
           <div class="legend-item">
-            <span class="legend-pin" aria-label="道路冠水" style="--pin-color: #f9a825;"></span>
+            <span class="legend-pin" aria-label="道路冠水" style="--pin-color: #f9a825; --pin-icon: '🚗';"></span>
             <span>道路冠水</span>
           </div>
           <div class="legend-item">
-            <span class="legend-pin" aria-label="道路寸断" style="--pin-color: #c2185b;"></span>
+            <span class="legend-pin" aria-label="道路寸断" style="--pin-color: #c2185b; --pin-icon: '🚧';"></span>
             <span>道路寸断</span>
           </div>
           <div class="legend-item">
-            <span class="legend-pin" aria-label="津波" style="--pin-color: #00838f;"></span>
+            <span class="legend-pin" aria-label="津波" style="--pin-color: #00838f; --pin-icon: '🌊';"></span>
             <span>津波</span>
           </div>
           <div class="legend-item">
-            <span class="legend-pin" aria-label="獣害" style="--pin-color: #6a1b9a;"></span>
+            <span class="legend-pin" aria-label="獣害" style="--pin-color: #6a1b9a; --pin-icon: '🐾';"></span>
             <span>獣害</span>
           </div>
         </div>
@@ -319,9 +319,11 @@
   }
 
   .legend-pin {
-    display: inline-block;
-    width: 18px;
-    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
     border-radius: 50% 50% 50% 0;
     border: 2px solid #ffffff;
     transform: rotate(-45deg);
@@ -329,17 +331,17 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     position: relative;
     flex-shrink: 0;
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 0.72rem;
   }
 
-  .legend-pin::after {
-    content: "";
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.7);
+  .legend-pin::before {
+    content: var(--pin-icon, '•');
+    display: inline-block;
+    transform: rotate(45deg);
+    line-height: 1;
+    font-weight: 900;
   }
 
   .map-card {
@@ -673,7 +675,7 @@ document.addEventListener('DOMContentLoaded', function () {
     weatherContent.innerHTML = `
       <div class="weather-status weather-safe">
         <span class="status-badge" aria-hidden="true">✓</span>
-        <span>現在、警報・注意報は発表されていません。</span>
+        <span>現在、警報・注意報について気象庁からの発表はありません。</span>
       </div>
       <div class="weather-row"><span class="icon">◌</span><span>発表時刻: ${escapeHtml(data.report_time || '不明')}</span></div>
       <div class="weather-row"><span class="icon">◔</span><span>最終取得時刻: ${escapeHtml(data.last_fetch_time || '更新中...')}</span></div>
@@ -701,6 +703,7 @@ document.addEventListener('DOMContentLoaded', function () {
   refreshButton.addEventListener('click', fetchWeatherWarnings);
   loadDisasterMarkers();
   fetchWeatherWarnings();
+  setInterval(loadDisasterMarkers, 5000);
   setInterval(fetchWeatherWarnings, 600000);
 });
 </script>

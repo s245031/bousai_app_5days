@@ -35,19 +35,45 @@ class ShelterAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('避難所検索', html)
         self.assertIn('避難所を選んだ基準の順に表示します', html)
+        self.assertIn('検索ボタン', html)
         self.assertIn('name="conditions"', html)
         self.assertIn('最も重視する条件', html)
         self.assertIn('A', html)
         self.assertIn('B', html)
         self.assertIn('C', html)
 
-    def test_shelter_search_keeps_sort_and_district_params(self):
+    def test_search_results_honors_selected_conditions_order(self):
+        response = self.client.get('/search_results?conditions=facilities,distance')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.get_shelter_names(html), ['C', 'B', 'A'])
+
+    def test_parse_area_warnings_ignores_cleared_statuses(self):
+        warning_data = [{
+            "reportDatetime": "2026-09-10T12:00:00+09:00",
+            "warning": {
+                "class20Items": [{
+                    "areaCode": "0220500",
+                    "kinds": [{
+                        "status": "解除",
+                        "code": "00"
+                    }]
+                }]
+            }
+        }]
+
+        warnings, _ = shelter_app.parse_area_warnings(warning_data)
+
+        self.assertEqual(warnings, [])
+
+    def test_shelter_search_uses_sort_param_without_district_field(self):
         response = self.client.get('/shelter_search?sort=occupancy&district=A')
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('value="occupancy"', html)
-        self.assertIn('name="district"', html)
+        self.assertNotIn('name="district"', html)
         self.assertIn('避難所検索', html)
 
     def test_full_shelters_are_not_hidden_from_search_results(self):
@@ -144,6 +170,17 @@ class ShelterAppTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn('/login?next=/shelter_register', response.location)
+
+    def test_board_page_uses_single_disaster_selection(self):
+        response = self.client.get('/board')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('name="icon"', html)
+        self.assertIn('disasterPinPreview', html)
+        self.assertIn('disaster-pin-drop-zone', html)
+        self.assertIn('🌊 河川洪水', html)
+        self.assertIn('⛰ 土砂災害', html)
 
     def test_board_page_is_public(self):
         response = self.client.get('/board')

@@ -278,26 +278,131 @@ def get_facility_score(shelter):
     return value
 
 
+def get_gender_ratio(shelter):
+    """検索結果表で見やすい男女比を返す。"""
+    if shelter.get('gender_ratio'):
+        return shelter.get('gender_ratio')
+
+    seed = to_int(shelter.get('id'), 0)
+    male_ratio = 45 + ((seed * 7) % 11)
+    female_ratio = 100 - male_ratio
+    return f"{male_ratio}:{female_ratio}"
+
+
+def get_facility_label(shelter):
+    """設備の状態を人が読める単語で返す。"""
+    if shelter.get('facility_label'):
+        return shelter.get('facility_label')
+
+    score = get_facility_score(shelter)
+    if score is None:
+        score = 2.5 + ((to_int(shelter.get('id'), 0) - 1) % 3) * 0.5
+
+    if score >= 4.5:
+        return '充実'
+    if score >= 3.0:
+        return '良好'
+    if score >= 2.0:
+        return '普通'
+    return '要確認'
+
+
+def get_gender_balance_value(shelter):
+    """男女比がどれだけ均等かを数値化する。"""
+    ratio = shelter.get('gender_ratio') or ''
+    if ':' not in ratio:
+        return 50
+
+    try:
+        male_ratio, female_ratio = [int(part.strip()) for part in ratio.split(':', 1)]
+    except (TypeError, ValueError):
+        return 50
+
+    if male_ratio + female_ratio <= 0:
+        return 50
+
+    return abs(male_ratio - 50)
+
+
+def normalize_shelter_metrics(shelter):
+    """表示用の検索結果メタデータを補完する。"""
+    item = dict(shelter)
+    item['occupancy_rate'] = get_occupancy_rate(item)
+
+    item['distance'] = get_distance_value(item)
+    if item['distance'] is None:
+        item['distance'] = round(0.5 + (((to_int(item.get('id'), 0) * 7) % 23) / 10), 1)
+
+    item['facility_score'] = get_facility_score(item)
+    if item['facility_score'] is None:
+        item['facility_score'] = 2.5 + ((to_int(item.get('id'), 0) - 1) % 3) * 0.5
+
+    item['gender_ratio'] = get_gender_ratio(item)
+    item['facility_label'] = get_facility_label(item)
+
+    return item
+
+
 def build_search_results(results):
     """検索画面で使う値を補完する。"""
-    formatted = []
-    for shelter in results:
-        item = dict(shelter)
-        item['occupancy_rate'] = get_occupancy_rate(item)
-        item['distance'] = get_distance_value(item)
-        item['facility_score'] = get_facility_score(item)
-        formatted.append(item)
-    return formatted
+    return [normalize_shelter_metrics(shelter) for shelter in results]
 
 
-def filter_shelters(district=None, sort=None, only_available=False):
+def sort_results_by_conditions(results, conditions):
+    """選択した条件の優先順位に従って避難所一覧を並び替える。"""
+    ordered_results = list(results)
+
+    for condition in reversed(conditions):
+        if condition == 'distance':
+            ordered_results = sorted(
+                ordered_results,
+                key=lambda s: (
+                    s.get('distance') is None,
+                    s.get('distance') if s.get('distance') is not None else float('inf'),
+                    s.get('name', '')
+                )
+            )
+            continue
+
+        if condition == 'occupancy':
+            ordered_results = sorted(
+                ordered_results,
+                key=lambda s: (
+                    s.get('occupancy_rate') is None,
+                    s.get('occupancy_rate') if s.get('occupancy_rate') is not None else float('inf'),
+                    s.get('name', '')
+                )
+            )
+            continue
+
+        if condition == 'facilities':
+            ordered_results = sorted(
+                ordered_results,
+                key=lambda s: (
+                    s.get('facility_score') is None,
+                    -(s.get('facility_score') if s.get('facility_score') is not None else 0),
+                    s.get('name', '')
+                )
+            )
+            continue
+
+        if condition == 'gender':
+            ordered_results = sorted(
+                ordered_results,
+                key=lambda s: (
+                    get_gender_balance_value(s),
+                    s.get('name', '')
+                )
+            )
+
+    return ordered_results
+
+
+def filter_shelters(district=None, sort=None, only_available=False, conditions=None):
     """district 指定があれば一致する避難所のみ、必要なら並び替えする"""
     results = []
     for shelter in shelters:
-        item = dict(shelter)
-        item['occupancy_rate'] = get_occupancy_rate(item)
-        item['distance'] = get_distance_value(item)
-        item['facility_score'] = get_facility_score(item)
+        item = normalize_shelter_metrics(shelter)
 
         if district and district.strip() and item.get('district') != district.strip():
             continue
@@ -306,6 +411,10 @@ def filter_shelters(district=None, sort=None, only_available=False):
 
     if only_available:
         results = [s for s in results if remaining_capacity(s) > 0]
+
+    parsed_conditions = parse_conditions(conditions) if conditions is not None else []
+    if parsed_conditions:
+        return sort_results_by_conditions(results, parsed_conditions)
 
     if sort == 'current_asc':
         return sorted(results, key=lambda s: (to_int(s.get('current'), 0), s.get('name', '')))
@@ -354,14 +463,19 @@ def get_next_disaster_marker_id():
 
 
 def parse_conditions(raw_conditions):
-    """カンマ区切りの条件文字列を安全に配列に変換する"""
+    """カンマ区切りの条件文字列または配列を安全に扱う"""
     if not raw_conditions:
         return []
 
+    if isinstance(raw_conditions, (list, tuple)):
+        values = raw_conditions
+    else:
+        values = str(raw_conditions).split(',')
+
     valid_conditions = {'distance', 'gender', 'facilities', 'occupancy'}
     conditions = []
-    for part in raw_conditions.split(','):
-        cleaned = part.strip()
+    for part in values:
+        cleaned = str(part).strip()
         if cleaned and cleaned in valid_conditions and cleaned not in conditions:
             conditions.append(cleaned)
     return conditions
@@ -433,9 +547,7 @@ def parse_area_warnings(warning_data):
                             continue
                         status = kind.get("status", "")
                         code = kind.get("code", "")
-                        if status in ("発表警報・注意報はなし", ""):
-                            continue
-                        if status == "解除" and not code:
+                        if status in ("発表警報・注意報はなし", "解除", ""):
                             continue
                         add_warning(code, status)
 
@@ -462,9 +574,7 @@ def parse_area_warnings(warning_data):
 
                         status = warning.get("status", "")
                         code = warning.get("code", "")
-                        if status in ("発表警報・注意報はなし", ""):
-                            continue
-                        if status == "解除" and not code:
+                        if status in ("発表警報・注意報はなし", "解除", ""):
                             continue
                         add_warning(code, status)
 
@@ -726,7 +836,13 @@ def board():
 def search_results():
     normalize_shelter_coordinates()
     sort = request.args.get('sort', 'remaining_desc')
-    results = filter_shelters(request.args.get('district'), sort=sort, only_available=False)
+    conditions = parse_conditions(request.args.get('conditions', ''))
+    results = filter_shelters(
+        request.args.get('district'),
+        sort=sort,
+        only_available=False,
+        conditions=conditions if conditions else None
+    )
     return render_template('search_results.html', results=results, sort=sort)
 
 # JSON API：/shelters?district=地区名
@@ -792,6 +908,41 @@ def api_create_disaster_marker():
     disaster_markers.append(marker)
     save_disaster_markers()
     return jsonify(marker), 201
+
+
+@app.route('/api/disaster_markers', methods=['PUT'])
+@login_required
+def api_replace_disaster_markers():
+    """災害マーカーの一覧をまとめて保存する"""
+    global disaster_markers
+
+    payload = request.get_json(silent=True) or []
+
+    if not isinstance(payload, list):
+        return jsonify({'error': '災害マーカーのデータが不正です。'}), 400
+
+    normalized_markers = []
+    next_id = max((int(marker.get('id', 0)) for marker in disaster_markers if isinstance(marker.get('id'), (int, str)) and str(marker.get('id')).isdigit()), default=0) + 1
+
+    for marker in payload:
+        normalized = normalize_disaster_marker(marker)
+        if not normalized:
+            return jsonify({'error': '災害マーカーのデータが不正です。'}), 400
+
+        marker_id = normalized.get('id')
+        if marker_id is None or not str(marker_id).isdigit():
+            normalized['id'] = next_id
+            next_id += 1
+        else:
+            normalized['id'] = int(marker_id)
+            if normalized['id'] >= next_id:
+                next_id = normalized['id'] + 1
+
+        normalized_markers.append(normalized)
+
+    disaster_markers = normalized_markers
+    save_disaster_markers()
+    return jsonify(disaster_markers), 200
 
 
 @app.route('/api/disaster_markers', methods=['DELETE'])

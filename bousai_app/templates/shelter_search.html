@@ -1,163 +1,373 @@
 {% extends "base.html" %}
 
+{% block title %}防災アプリ（避難所検索画面）{% endblock %}
+{% block header_title %}防災アプリ（避難所検索画面）{% endblock %}
+
 {% block content %}
 <style>
-  .shelter-search-page {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
+  .page-shell {
+    max-width: none;
+    margin: 0;
+    padding: 0;
   }
 
-  .shelter-search-layout {
+  main {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .search-shell {
+    width: 100%;
+    margin: 0 auto;
     display: flex;
-    gap: 24px;
+    gap: 18px;
     align-items: stretch;
-  }
-
-  .search-panel,
-  .map-panel,
-  .results-panel {
-    background: #ffffff;
-    border: 1px solid #d9dde4;
-    border-radius: 18px;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    height: calc(100vh - 76px);
+    max-height: calc(100vh - 76px);
+    padding: 18px;
+    box-sizing: border-box;
   }
 
   .map-panel {
-    flex: 1.2 1 60%;
-    min-height: 420px;
-    overflow: hidden;
-    background: linear-gradient(180deg, #dff1f9 0%, #c7e7f4 100%);
+    background: rgba(252, 253, 254, 0.85);
+    border: 1px solid #dfe7ee;
+    border-radius: 16px;
+    padding: 18px;
+    box-shadow: 0 6px 16px rgba(12, 79, 141, 0.06);
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .search-panel {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 18px;
+    background: rgba(252, 253, 254, 0.85);
+    border: 1px solid #dfe7ee;
+    border-radius: 16px;
+    box-shadow: 0 6px 16px rgba(12, 79, 141, 0.06);
+  }
+
+  .search-panel h3 {
+    margin: 0 0 18px;
+    color: #16466d;
+    font-size: 1rem;
+    letter-spacing: 0.04em;
+  }
+
+  .search-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 106px;
+    gap: 12px 16px;
+    align-items: start;
+  }
+
+  .field {
+    min-width: 0;
+  }
+
+  .field label {
+    display: none;
+  }
+
+  .field input,
+  .field select {
+    width: 100%;
+    height: 38px;
+    border: 1px solid #b7c8d6;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    background: #fff;
+    color: #1f2b3a;
+    box-sizing: border-box;
+  }
+
+  .field input:focus,
+  .field select:focus {
+    outline: 2px solid rgba(13, 115, 215, 0.2);
+    border-color: #0d73d7;
+  }
+
+  .search-btn {
+    width: 106px;
+    height: 38px;
+    border: 1px solid #0d73d7;
+    border-radius: 8px;
+    background: #0d73d7;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .search-note {
+    margin: 0 0 12px 35px;
+    color: #526474;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  .search-note strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-right: 8px;
+    color: #a52b24;
+    font-size: 0.88rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .search-note strong::before {
+    content: "!";
+    display: inline-grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border: 2px solid #c64a41;
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0;
+  }
+
+  .search-note span {
+    color: #526474;
+  }
+
+  .search-note::after {
+    content: "↓  選択肢へ";
+    display: block;
+    margin: 5px 0 0 4px;
+    color: #397da9;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .search-guide {
+    grid-column: 1 / -1;
+    min-height: 620px;
+    margin-top: 4px;
+    border: 1px solid #c7d8e5;
+    border-radius: 12px;
+    background: #f7fbfe;
+    padding: 14px 12px 12px;
     position: relative;
+    box-shadow: inset 0 3px 0 #397da9;
+  }
+
+  .search-guide > .search-note {
+    position: relative;
+    z-index: 1;
+  }
+
+  .guide-person {
+    position: absolute;
+    left: 12px;
+    top: 17px;
+    width: 25px;
+    height: 31px;
+  }
+
+  .guide-person::before {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 0;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: #555;
+  }
+
+  .guide-person::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    bottom: 0;
+    width: 23px;
+    height: 17px;
+    border-radius: 13px 13px 5px 5px;
+    background: #555;
+  }
+
+  .guide-balloon {
+    margin-left: 35px;
+    width: calc(100% - 55px);
+    min-height: 40px;
+    padding: 9px 12px;
+    border: 1px solid #a9bdca;
+    border-radius: 5px 14px 14px 14px;
+    background: #fff;
+    box-shadow: 0 3px 8px rgba(32, 67, 91, 0.08);
+    color: #28465d;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    text-align: center;
+    position: relative;
+  }
+
+  .guide-balloon::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 12px;
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    border-right: 8px solid #a9bdca;
+  }
+
+  .guide-balloon::after {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: 13px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 7px solid #fff;
+  }
+
+  .guide-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    width: calc(100% - 55px);
+    padding-right: 4px;
+    margin-left: 35px;
+  }
+
+  .guide-messages .guide-balloon {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .guide-message-row {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .guide-message {
+    max-width: 82%;
+    padding: 8px 10px;
+    border: 1px solid #8bc2a0;
+    border-radius: 12px 12px 3px 12px;
+    background: linear-gradient(180deg, #dbf5e2 0%, #cfeeda 100%);
+    color: #24553a;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    box-shadow: 0 2px 6px rgba(64, 120, 83, 0.08);
+  }
+
+  .guide-actions {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px;
+    margin: 0 0 14px;
+    border: 1px solid #b6d0e0;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+  }
+
+  .guide-action {
+    min-height: 38px;
+    border: 2px solid #79a9c9;
+    border-radius: 8px;
+    background: #fff;
+    color: #16466d;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 5px 3px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .guide-action:hover,
+  .guide-action:focus-visible {
+    border-color: #0d73d7;
+    background: #edf7ff;
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .guide-action.is-selected {
+    background: #e1eff9;
+    border-color: #397da9;
+    color: #174d70;
+    font-weight: 700;
+  }
+
+  .search-btn:hover {
+    filter: brightness(0.96);
+  }
+
+  .map-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 300px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(15, 93, 175, 0.15);
+    background: #dfeefb;
   }
 
   #shelterMap {
     width: 100%;
     height: 100%;
-    min-height: 420px;
-    background: #d8edf7;
   }
 
-  .search-panel {
-    flex: 0 0 360px;
-    padding: 24px;
+  .map-zoom {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    z-index: 500;
+    background: rgba(255,255,255,0.82);
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    border: 1px solid rgba(13, 94, 175, 0.08);
+  }
+
+  .map-zoom button {
+    display: block;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: #1d2f42;
+    font-size: 2rem;
+    cursor: pointer;
+  }
+
+  .map-zoom button + button {
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
   }
 
   .results-panel {
+    background: #ffffff;
+    border: 1px solid #d9dde4;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
     padding: 24px;
-  }
-
-  .search-title {
-    margin: 0 0 12px;
-    font-size: 1.8rem;
-  }
-
-  .warning-box {
-    background: #fff5e6;
-    border: 1px solid #f5c07b;
-    color: #774d00;
-    border-radius: 12px;
-    padding: 10px 12px;
-    font-size: 0.92rem;
-    margin-bottom: 18px;
-  }
-
-  .search-help {
-    font-size: 0.94rem;
-    color: #4b5563;
-    margin-bottom: 16px;
-  }
-
-  .sort-select {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #c3cbd7;
-    font-size: 1rem;
-    margin-bottom: 18px;
-    background: white;
-  }
-
-  .search-button {
-    width: 100%;
-    border: none;
-    border-radius: 12px;
-    background: #0d5c96;
-    color: white;
-    font-weight: 700;
-    padding: 12px 18px;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-
-  .search-button:hover,
-  .search-button:focus-visible {
-    background: #0b4a80;
-  }
-
-  .condition-guide {
-    margin-top: 20px;
-    border-top: 1px solid #e5e7eb;
-    padding-top: 18px;
-  }
-
-  .guide-header {
-    margin: 0 0 14px;
-    font-size: 1rem;
-    font-weight: 700;
-  }
-
-  .guide-choices {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .choice-button {
-    border: 1px solid #0d5c96;
-    background: #edf6ff;
-    color: #0d5c96;
-    border-radius: 999px;
-    padding: 8px 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .choice-button:hover,
-  .choice-button:focus-visible {
-    background: #d9ebff;
-  }
-
-  .choice-button.is-selected {
-    display: none;
-  }
-
-  .history {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-height: 80px;
-    margin-top: 8px;
-  }
-
-  .history-item {
-    background: #f3f4f6;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 0.93rem;
-    line-height: 1.4;
-    color: #1f2937;
-  }
-
-  .history-item strong {
-    color: #0d5c96;
-  }
-
-  .history-item.is-prompt {
-    background: #edf6ff;
-    border-left: 4px solid #0d5c96;
+    margin: 18px;
   }
 
   .results-header {
@@ -232,116 +442,75 @@
     color: #186a3b;
   }
 
-  @media (max-width: 900px) {
-    .shelter-search-layout {
-      display: block;
+  @media (max-width: 680px) {
+    .search-shell {
+      flex-direction: column;
+      min-height: auto;
+      padding: 12px;
     }
 
-    .search-panel,
     .map-panel,
-    .results-panel {
+    .search-panel {
       width: 100%;
-      margin-bottom: 18px;
+      flex-basis: auto;
+    }
+
+    .map-wrap {
+      height: min(45vh, 360px);
+      min-height: 240px;
+    }
+
+    .search-guide {
+      height: min(70vh, 620px);
+      min-height: 420px;
+    }
+
+    .results-panel {
+      margin: 12px;
     }
   }
 </style>
 
-<div class="shelter-search-page">
-  <div class="shelter-search-layout">
-    <section class="map-panel" aria-label="避難所地図">
-      <div id="shelterMap" aria-label="避難所マップ"></div>
-    </section>
-
-    <aside class="search-panel" aria-label="避難所検索フォーム">
-      <h2 class="search-title">避難所検索</h2>
-
-      <div class="warning-box" role="note">
-        緊急時のため、現在の状況と避難先の条件を優先して確認してください。
+<div class="search-shell">
+  <div class="map-panel">
+    <div class="map-wrap">
+      <div class="map-zoom" aria-label="ズームボタン">
+        <button type="button" aria-label="拡大" data-action="in">＋</button>
+        <button type="button" aria-label="縮小" data-action="out">－</button>
       </div>
-
-      <p class="search-help">避難所を選んだ基準の順に表示します</p>
-
-      <form id="shelterSearchForm" method="get" action="/shelter_search">
-        <label for="district" class="sr-only" style="position:absolute; left:-10000px;">地区</label>
-        <input id="district" name="district" type="text" value="{{ district or '' }}" placeholder="地区名で絞り込み" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:10px; border:1px solid #c3cbd7; margin-bottom:16px;" aria-label="地区名で絞り込み" />
-
-        <label for="sort" style="display:block; margin-bottom:6px; font-weight:600;">表示基準</label>
-        <select id="sort" name="sort" class="sort-select" aria-label="表示基準を選択">
-          <option value="">▼ 選択してください</option>
-          <option value="distance" {% if sort == 'distance' %}selected{% endif %}>避難所までの距離が近い順</option>
-          <option value="occupancy" {% if sort == 'occupancy' %}selected{% endif %}>収容可能数に対する避難者率が低い順</option>
-          <option value="facilities" {% if sort == 'facilities' %}selected{% endif %}>設備が良い順</option>
-        </select>
-
-        <input type="hidden" name="conditions" id="conditions" value="{{ conditions|join(',') if conditions else '' }}" />
-        <button type="submit" class="search-button" aria-label="避難所を検索">検索</button>
-      </form>
-
-      <div class="condition-guide" aria-live="polite">
-        <h3 class="guide-header">最も重視する条件</h3>
-
-        <div class="guide-choices" aria-label="条件選択肢">
-          <button type="button" class="choice-button" data-condition="distance" {% if 'distance' in conditions %}disabled aria-hidden="true"{% endif %}>家からの距離</button>
-          <button type="button" class="choice-button" data-condition="gender" {% if 'gender' in conditions %}disabled aria-hidden="true"{% endif %}>男女比</button>
-          <button type="button" class="choice-button" data-condition="facilities" {% if 'facilities' in conditions %}disabled aria-hidden="true"{% endif %}>設備</button>
-          <button type="button" class="choice-button" data-condition="occupancy" {% if 'occupancy' in conditions %}disabled aria-hidden="true"{% endif %}>現在の収容者数</button>
-        </div>
-
-        <div class="history" id="conditionHistory" aria-live="polite">
-          <div class="history-item is-prompt"><strong>避難所に最も求めることは何ですか？</strong></div>
-          {% for condition in conditions %}
-            <div class="history-item"><strong>選択済み:</strong> {{ condition }}</div>
-          {% endfor %}
-        </div>
-      </div>
-    </aside>
+      <div id="shelterMap"></div>
+    </div>
   </div>
 
-  <section class="results-panel" aria-label="避難所検索結果">
-    <div class="results-header">
-      <h3 style="margin:0;">検索結果</h3>
-      <div class="results-count">{{ results|length }}件</div>
-    </div>
-
-    {% if results %}
-      <div class="results-table-wrap">
-        <table class="result-table" aria-label="避難所一覧">
-          <thead>
-            <tr>
-              <th>避難所名</th>
-              <th>距離</th>
-              <th>収容者率</th>
-              <th>設備</th>
-              <th>最大受け入れ可能人数</th>
-              <th>現在の受け入れ人数</th>
-              <th>残り人数</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for shelter in results %}
-              {% set capacity = shelter.capacity|default(0) %}
-              {% set current = shelter.current|default(0) %}
-              {% set remaining = capacity - current if capacity else 0 %}
-              {% set occupancy_rate = shelter.occupancy_rate %}
-              {% set distance = shelter.distance %}
-              {% set facility_score = shelter.facility_score %}
-              <tr>
-                <td>{{ shelter.name }}</td>
-                <td>{{ '%.1f'|format(distance) if distance is not none else '未設定' }}</td>
-                <td>{{ '%.0f'|format((occupancy_rate * 100)) if occupancy_rate is not none else '未設定' }}%</td>
-                <td>{{ facility_score if facility_score is not none else '未設定' }}</td>
-                <td>{{ capacity }}人</td>
-                <td>{{ current }}人</td>
-                <td>{{ remaining }}人</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+  <aside class="search-panel">
+    <h3>避難所検索</h3>
+    <p class="search-note"><strong>緊急時はこちら</strong><span>避難所を選んだ基準の順に表示します</span></p>
+    <form class="search-form" method="get" action="/search_results">
+      <div class="field">
+        <label for="sort">表示基準</label>
+        <select id="sort" name="sort" aria-label="避難所の表示基準">
+          <option value="">▼ 選択してください</option>
+          <option value="distance" {% if sort == 'distance' %}selected{% endif %}>避難所までの距離が近い順</option>
+          <option value="occupancy" {% if sort == 'occupancy' %}selected{% endif %}>空き率が高い順</option>
+          <option value="facilities" {% if sort == 'facilities' %}selected{% endif %}>設備が良い順</option>
+        </select>
       </div>
-    {% else %}
-      <p class="result-note">該当する避難所が見つかりませんでした</p>
-    {% endif %}
-  </section>
+
+      <button class="search-btn" type="submit">検索ボタン</button>
+
+      <div class="search-guide">
+        <div class="guide-person" aria-hidden="true"></div>
+        <div class="guide-actions">
+          <button class="guide-action" type="button" data-condition="distance">家からの距離</button>
+          <button class="guide-action" type="button" data-condition="gender">男女比</button>
+          <button class="guide-action" type="button" data-condition="facilities">設備</button>
+          <button class="guide-action" type="button" data-condition="occupancy">現在の収容者数</button>
+        </div>
+        <div class="guide-messages" id="guideMessages" aria-live="polite"></div>
+        <input type="hidden" name="conditions" id="conditions" value="{{ conditions|join(',') if conditions else '' }}" />
+      </div>
+    </form>
+  </aside>
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -350,33 +519,110 @@
   document.addEventListener('DOMContentLoaded', function () {
     const sheltersData = {{ results | tojson | safe }};
     const mapEl = document.getElementById('shelterMap');
-    const form = document.getElementById('shelterSearchForm');
+    const form = document.querySelector('.search-form');
     const sortSelect = document.getElementById('sort');
     const conditionsInput = document.getElementById('conditions');
-    const historyEl = document.getElementById('conditionHistory');
-    const conditionButtons = Array.from(document.querySelectorAll('.choice-button'));
-
-    const defaultCenter = [40.823, 140.745];
-    const map = L.map('shelterMap').setView(defaultCenter, 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    const markerLayer = L.layerGroup().addTo(map);
+    const guideMessages = document.getElementById('guideMessages');
+    const conditionButtons = Array.from(document.querySelectorAll('.guide-action'));
 
     if (!mapEl) {
       return;
     }
 
-    const filterValidMarkers = sheltersData.filter(function (shelter) {
-      return shelter && shelter.lat !== undefined && shelter.lng !== undefined && shelter.lat !== null && shelter.lng !== null;
-    });
+    const map = L.map('shelterMap', {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([40.823, 140.745], 12);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    const markerLayer = L.layerGroup().addTo(map);
+    const disasterMarkerLayer = L.layerGroup().addTo(map);
+    let disasterMarkers = [];
+
+    function getDisasterScaleColor(scale) {
+      if (scale === '小規模') return '#facc15';
+      if (scale === '中規模') return '#f97316';
+      if (scale === '大規模') return '#ef4444';
+      return '#0d5c96';
+    }
+
+    function getDisasterScaleSize(scale) {
+      if (scale === '小規模') return 26;
+      if (scale === '中規模') return 34;
+      if (scale === '大規模') return 50;
+      return 26;
+    }
+
+    function buildDisasterIcon(scale, zoom) {
+      const baseSize = getDisasterScaleSize(scale);
+      const zoomScale = Math.pow(1.12, zoom - 12);
+      const size = Math.round(baseSize * Math.max(0.65, Math.min(1.6, zoomScale)));
+      const color = getDisasterScaleColor(scale);
+
+      return L.divIcon({
+        className: 'map-disaster-icon',
+        html: '<span class="map-disaster-shape" style="width:' + size + 'px;height:' + size + 'px;background:' + color + ';border-color:' + color + ';" aria-hidden="true"></span>',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2]
+      });
+    }
+
+    function renderDisasterMarkers(markers) {
+      disasterMarkerLayer.clearLayers();
+
+      if (!Array.isArray(markers)) {
+        return;
+      }
+
+      markers.forEach(function (marker) {
+        if (!marker || marker.latitude === undefined || marker.longitude === undefined) {
+          return;
+        }
+
+        const scale = marker.scale || '小規模';
+        const icon = buildDisasterIcon(scale, map.getZoom());
+        const disasterMarker = L.marker([marker.latitude, marker.longitude], {
+          icon: icon
+        }).addTo(disasterMarkerLayer);
+
+        disasterMarker.bindPopup(
+          '<div style="font-size:0.95rem; line-height:1.5;">' +
+            '<strong>' + (marker.name || '災害情報') + '</strong><br>' +
+            '住所: ' + (marker.address || '未取得') + '<br>' +
+            '日時: ' + (marker.datetime || '未入力') + '<br>' +
+            '事項: ' + (marker.note || '未入力') +
+          '</div>'
+        );
+      });
+    }
+
+    function loadDisasterMarkers() {
+      fetch('/api/disaster_markers')
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          disasterMarkers = Array.isArray(data) ? data : [];
+          renderDisasterMarkers(disasterMarkers);
+        })
+        .catch(function (error) {
+          console.error('災害マーカーの取得に失敗しました:', error);
+        });
+    }
 
     function getColorByRemainingRate(rate) {
       if (rate <= 30) return '#d32f2f';
       if (rate <= 70) return '#f4b400';
       return '#2e7d32';
     }
+
+    const filterValidMarkers = sheltersData.filter(function (shelter) {
+      return shelter && shelter.lat !== undefined && shelter.lng !== undefined && shelter.lat !== null && shelter.lng !== null;
+    });
 
     filterValidMarkers.forEach(function (shelter) {
       const capacity = Number(shelter.capacity || 0);
@@ -410,86 +656,113 @@
       map.fitBounds(bounds, { padding: [20, 20] });
     }
 
-    const submitConditions = [];
-    const selectedConditions = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
-      return value.trim();
-    }).filter(Boolean)));
+    function getConditionLabel(condition) {
+      return condition === 'distance'
+        ? '家からの距離'
+        : condition === 'gender'
+          ? '男女比'
+          : condition === 'facilities'
+            ? '設備'
+            : condition === 'occupancy'
+              ? '現在の収容者数'
+              : condition;
+    }
+
+    function addQuestionBubble(text) {
+      const prompt = document.createElement('div');
+      prompt.className = 'guide-balloon';
+      prompt.textContent = text;
+      guideMessages.appendChild(prompt);
+    }
+
+    function addAnswerBubble(text) {
+      const row = document.createElement('div');
+      row.className = 'guide-message-row';
+
+      const message = document.createElement('div');
+      message.className = 'guide-message';
+      message.textContent = text;
+
+      row.appendChild(message);
+      guideMessages.appendChild(row);
+    }
 
     function syncHistory() {
       const currentConditions = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
         return value.trim();
       }).filter(Boolean)));
 
-      const historyItems = [
-        '<div class="history-item is-prompt"><strong>避難所に最も求めることは何ですか？</strong></div>'
-      ];
+      guideMessages.innerHTML = '';
 
-      currentConditions.forEach(function (condition) {
-        historyItems.push('<div class="history-item"><strong>選択済み:</strong> ' + condition + '</div>');
-      });
+      if (currentConditions.length === 0) {
+        addQuestionBubble('最も重視する条件は何ですか？');
+      } else {
+        currentConditions.forEach(function (condition, index) {
+          addQuestionBubble(index === 0
+            ? '最も重視する条件は何ですか？'
+            : '次に求めることは何ですか？');
+          addAnswerBubble(getConditionLabel(condition));
+        });
 
-      historyEl.innerHTML = historyItems.join('');
+        if (currentConditions.length < conditionButtons.length) {
+          addQuestionBubble('次に求めることは何ですか？');
+        } else {
+          addQuestionBubble('条件を選択しました');
+        }
+      }
 
       conditionButtons.forEach(function (button) {
         const condition = button.dataset.condition;
         const isSelected = currentConditions.includes(condition);
         button.disabled = isSelected;
-        button.setAttribute('aria-hidden', isSelected ? 'true' : 'false');
+        button.hidden = isSelected;
         button.classList.toggle('is-selected', isSelected);
       });
-    }
-
-    function submitSearch(event) {
-      const selectedList = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
-        return value.trim();
-      }).filter(Boolean)));
-      const hasDuplicate = selectedList.length !== (conditionsInput.value || '').split(',').filter(function (value) {
-        return value.trim();
-      }).length;
-
-      if (hasDuplicate) {
-        conditionsInput.value = selectedList.join(',');
-      }
-
-      if (event && event.type === 'click') {
-        form.submit();
-      }
     }
 
     conditionButtons.forEach(function (button) {
       button.addEventListener('click', function () {
         const condition = button.dataset.condition;
-        if (!condition || selectedConditions.includes(condition)) {
+        if (!condition) {
           return;
         }
 
-        selectedConditions.push(condition);
-        conditionsInput.value = selectedConditions.join(',');
+        const currentConditions = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
+          return value.trim();
+        }).filter(Boolean)));
+
+        if (currentConditions.includes(condition)) {
+          return;
+        }
+
+        currentConditions.push(condition);
+        conditionsInput.value = currentConditions.join(',');
         syncHistory();
 
-        const remainingButtons = conditionButtons.filter(function (candidate) {
-          return candidate.dataset.condition !== condition && !selectedConditions.includes(candidate.dataset.condition);
-        });
-
-        if (remainingButtons.length === 0) {
-          form.submit();
+        if (currentConditions.length >= conditionButtons.length) {
+          const params = new URLSearchParams();
+          params.set('conditions', currentConditions.join(','));
+          if (sortSelect.value) {
+            params.set('sort', sortSelect.value);
+          }
+          window.location.href = '/search_results?' + params.toString();
         }
       });
     });
 
-    sortSelect.addEventListener('change', function () {
-      form.submit();
+    document.querySelectorAll('.map-zoom button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.dataset.action === 'in') map.zoomIn();
+        else map.zoomOut();
+      });
     });
 
-    form.addEventListener('submit', function (event) {
-      if (conditionsInput.value) {
-        const uniqueConditions = Array.from(new Set(conditionsInput.value.split(',').map(function (value) {
-          return value.trim();
-        }).filter(Boolean)));
-        conditionsInput.value = uniqueConditions.join(',');
-      }
+    map.on('zoomend', function () {
+      renderDisasterMarkers(disasterMarkers);
     });
 
+    loadDisasterMarkers();
+    setInterval(loadDisasterMarkers, 5000);
     syncHistory();
   });
 </script>

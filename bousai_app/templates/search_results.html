@@ -30,6 +30,12 @@
     word-break: break-word;
   }
 
+  .table-panel th:first-child,
+  .table-panel td:first-child {
+    width: 24%;
+    min-width: 180px;
+  }
+
   .map-panel {
     min-height: 520px;
     border: 1px solid #d9dde4;
@@ -105,6 +111,9 @@
             <th>現在の受け入れ人数</th>
             <th>残り人数</th>
             <th>空き率 </th>
+            <th>家からの距離</th>
+            <th>男女比</th>
+            <th>設備</th>
           </tr>
         </thead>
         <tbody>
@@ -120,6 +129,9 @@
             <td style="background-color: {{ row_color }};">{{ current }}人</td>
             <td style="background-color: {{ row_color }};">{{ remaining }}人</td>
             <td style="background-color: {{ row_color }};">{{ rate }}%</td>
+            <td style="background-color: {{ row_color }};">{{ '%.1f'|format(shelter.distance) if shelter.distance is not none else '未設定' }}km</td>
+            <td style="background-color: {{ row_color }};">{{ shelter.gender_ratio or '未設定' }}</td>
+            <td style="background-color: {{ row_color }};">{{ shelter.facility_label or '未設定' }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -129,6 +141,7 @@
         <p style="display: flex; flex-wrap: wrap; gap: 12px; margin: 0;">
           <a href="/shelter_search" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #2cac72; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">避難所検索</a>
           <a href="/" style="display: inline-block; padding: 16px 24px; border-radius: 12px; background: #0d5c96; color: white; text-decoration: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center;">トップページへ戻る</a>
+          <button type="button" id="refreshResultsButton" style="padding: 16px 24px; border-radius: 12px; background: #f59e0b; color: white; border: none; font-weight: 700; font-size: 1rem; min-width: 180px; text-align: center; cursor: pointer;">更新</button>
         </p>
       </div>
     </div>
@@ -149,6 +162,13 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const sheltersData = {{ results | tojson | safe }};
+    const refreshResultsButton = document.getElementById('refreshResultsButton');
+
+    if (refreshResultsButton) {
+      refreshResultsButton.addEventListener('click', function () {
+        window.location.reload();
+      });
+    }
 
     if (!document.getElementById('shelterMap')) {
       return;
@@ -159,6 +179,81 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
+
+    const disasterMarkerLayer = L.layerGroup().addTo(map);
+    let disasterMarkers = [];
+
+    function getDisasterScaleColor(scale) {
+      if (scale === '小規模') return '#facc15';
+      if (scale === '中規模') return '#f97316';
+      if (scale === '大規模') return '#ef4444';
+      return '#0d5c96';
+    }
+
+    function getDisasterScaleSize(scale) {
+      if (scale === '小規模') return 26;
+      if (scale === '中規模') return 34;
+      if (scale === '大規模') return 50;
+      return 26;
+    }
+
+    function buildDisasterIcon(scale, zoom) {
+      const baseSize = getDisasterScaleSize(scale);
+      const zoomScale = Math.pow(1.12, zoom - 12);
+      const size = Math.round(baseSize * Math.max(0.65, Math.min(1.6, zoomScale)));
+      const color = getDisasterScaleColor(scale);
+
+      return L.divIcon({
+        className: 'map-disaster-icon',
+        html: '<span class="map-disaster-shape" style="width:' + size + 'px;height:' + size + 'px;background:' + color + ';border-color:' + color + ';" aria-hidden="true"></span>',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2]
+      });
+    }
+
+    function renderDisasterMarkers(markers) {
+      disasterMarkerLayer.clearLayers();
+
+      if (!Array.isArray(markers)) {
+        return;
+      }
+
+      markers.forEach(function (marker) {
+        if (!marker || marker.latitude === undefined || marker.longitude === undefined) {
+          return;
+        }
+
+        const scale = marker.scale || '小規模';
+        const icon = buildDisasterIcon(scale, map.getZoom());
+        const disasterMarker = L.marker([marker.latitude, marker.longitude], {
+          icon: icon
+        }).addTo(disasterMarkerLayer);
+
+        disasterMarker.bindPopup(
+          '<div style="font-size:0.95rem; line-height:1.5;">' +
+            '<strong>' + (marker.name || '災害情報') + '</strong><br>' +
+            '住所: ' + (marker.address || '未取得') + '<br>' +
+            '日時: ' + (marker.datetime || '未入力') + '<br>' +
+            '事項: ' + (marker.note || '未入力') +
+          '</div>'
+        );
+      });
+    }
+
+    function loadDisasterMarkers() {
+      fetch('/api/disaster_markers')
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (data) {
+          disasterMarkers = Array.isArray(data) ? data : [];
+          renderDisasterMarkers(disasterMarkers);
+        })
+        .catch(function (error) {
+          console.error('災害マーカーの取得に失敗しました:', error);
+        });
+    }
 
     const markers = sheltersData.filter(function (shelter) {
       return shelter.lat !== undefined && shelter.lng !== undefined;
@@ -201,6 +296,13 @@
         '残り空き率: ' + rate + '%'
       );
     });
+
+    map.on('zoomend', function () {
+      renderDisasterMarkers(disasterMarkers);
+    });
+
+    loadDisasterMarkers();
+    setInterval(loadDisasterMarkers, 5000);
   });
 </script>
 {% endblock %}
