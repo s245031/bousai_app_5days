@@ -153,7 +153,7 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if not session.get('logged_in'):
             # 現在のURLをnextパラメータとしてログイン画面にリダイレクト
-            return redirect(url_for('login', next=request.url))
+            return redirect(url_for('login', next=request.path))
         return f(*args, **kwargs)
     return decorated_function
 

@@ -18,6 +18,18 @@
     overflow-x: auto;
   }
 
+  .table-panel table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .table-panel th,
+  .table-panel td {
+    white-space: normal;
+    word-break: break-word;
+  }
+
   .map-panel {
     min-height: 520px;
     border: 1px solid #d9dde4;
@@ -59,11 +71,11 @@
       <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 900px;">
         <thead>
           <tr>
-            <th>避難所名</th>
-            <th>受け入れ可能人数</th>
+            <th>避難所名 </th>
+            <th>最大受け入れ可能人数 </th>
             <th>現在の受け入れ人数</th>
-            <th>残り空き人数</th>
-            <th>残り空き率</th>
+            <th>残り人数</th>
+            <th>空き率 </th>
           </tr>
         </thead>
         <tbody>
@@ -113,7 +125,7 @@
       return;
     }
 
-    const map = L.map('shelterMap').setView([40.823, 140.745], 10.8);
+    const map = L.map('shelterMap').setView([40.823, 140.745], 14);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'

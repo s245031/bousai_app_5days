@@ -125,6 +125,12 @@ class ShelterAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('受け入れ人数が受け入れ可能人数を上回っています。', response.get_data(as_text=True))
 
+    def test_login_redirect_uses_relative_next_path(self):
+        response = self.client.get('/shelter_register', follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/login?next=/shelter_register', response.location)
+
     def test_board_page_is_public(self):
         response = self.client.get('/board')
         html = response.get_data(as_text=True)
