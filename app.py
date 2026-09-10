@@ -96,7 +96,7 @@ def load_json(path, default):
         return default
 
 shelters = load_json(DATA_FILE, [])
-instructions = load_json(INSTRUCTIONS_FILE, [])
+instructions = []
 disaster_markers = []
 
 
@@ -171,6 +171,29 @@ def normalize_disaster_marker(marker):
     return normalized
 
 
+def normalize_instruction(instruction):
+    """住民向けの発信情報をホーム画面表示用に正規化する"""
+    if not isinstance(instruction, dict):
+        return None
+
+    content = (instruction.get('content') or '').strip()
+    if not content:
+        return None
+
+    normalized = {
+        'id': instruction.get('id', 0),
+        'target': instruction.get('target') or '住民',
+        'content': content,
+        'district': instruction.get('district') or instruction.get('area') or '',
+        'area': instruction.get('area') or instruction.get('district') or '',
+        'shelter': instruction.get('shelter') or '',
+        'status': instruction.get('status') or '発表',
+        'created_at': instruction.get('created_at') or get_japan_time(),
+        'updated_at': instruction.get('updated_at') or get_japan_time(),
+    }
+    return normalized
+
+
 def load_disaster_markers():
     raw_markers = load_json(DISASTER_MARKERS_FILE, [])
     normalized_markers = []
@@ -179,6 +202,16 @@ def load_disaster_markers():
         if normalized:
             normalized_markers.append(normalized)
     return normalized_markers
+
+
+def load_instructions():
+    raw_instructions = load_json(INSTRUCTIONS_FILE, [])
+    normalized_instructions = []
+    for instruction in raw_instructions:
+        normalized = normalize_instruction(instruction)
+        if normalized:
+            normalized_instructions.append(normalized)
+    return normalized_instructions
 
 
 def save_disaster_markers():
@@ -190,6 +223,7 @@ def save_disaster_markers():
         pass
 
 
+instructions = load_instructions()
 disaster_markers = load_disaster_markers()
 # ────────────────────────────────
 
@@ -865,6 +899,93 @@ def api_weather_warnings():
     return jsonify(get_weather_warnings())
 
 
+@app.route('/api/instructions', methods=['GET'])
+def api_get_instructions():
+    """発信情報の一覧を返す"""
+    return jsonify(instructions)
+
+
+@app.route('/api/instructions', methods=['POST'])
+def api_create_instruction():
+    """発信情報を保存し、ホーム画面に反映する"""
+    payload = request.get_json(silent=True) or {}
+
+    if not isinstance(payload, dict):
+        return jsonify({'error': 'リクエストが不正です。'}), 400
+
+    content = (payload.get('content') or '').strip()
+    if not content:
+        return jsonify({'error': '発信内容を入力してください。'}), 400
+
+    next_id = max((int(item.get('id', 0)) for item in instructions if isinstance(item.get('id'), (int, str)) and str(item.get('id')).isdigit()), default=0) + 1
+    normalized = normalize_instruction({
+        'id': next_id,
+        'target': '住民',
+        'content': content,
+        'district': payload.get('district') or '',
+        'area': payload.get('area') or payload.get('district') or '',
+        'shelter': payload.get('shelter') or '',
+        'status': payload.get('status') or '発表',
+        'created_at': get_japan_time(),
+        'updated_at': get_japan_time(),
+    })
+
+    if not normalized:
+        return jsonify({'error': '発信内容を入力してください。'}), 400
+
+    instructions.append(normalized)
+    save_instructions()
+    return jsonify(normalized), 201
+
+
+@app.route('/api/instructions/<int:instruction_id>', methods=['PUT'])
+def api_update_instruction(instruction_id):
+    """既存の発信情報を更新する"""
+    payload = request.get_json(silent=True) or {}
+
+    if not isinstance(payload, dict):
+        return jsonify({'error': 'リクエストが不正です。'}), 400
+
+    content = (payload.get('content') or '').strip()
+    if not content:
+        return jsonify({'error': '発信内容を入力してください。'}), 400
+
+    for index, item in enumerate(instructions):
+        if int(item.get('id', 0)) != instruction_id:
+            continue
+
+        updated = normalize_instruction({
+            **item,
+            'content': content,
+            'district': payload.get('district') or item.get('district') or item.get('area') or '',
+            'area': payload.get('area') or payload.get('district') or item.get('area') or item.get('district') or '',
+            'shelter': payload.get('shelter') or item.get('shelter') or '',
+            'status': payload.get('status') or item.get('status') or '発表',
+            'updated_at': get_japan_time(),
+        })
+
+        if not updated:
+            return jsonify({'error': '発信内容を入力してください。'}), 400
+
+        instructions[index] = updated
+        save_instructions()
+        return jsonify(updated), 200
+
+    return jsonify({'error': '対象の発信情報が見つかりません。'}), 404
+
+
+@app.route('/api/instructions/<int:instruction_id>', methods=['DELETE'])
+def api_delete_instruction(instruction_id):
+    """既存の発信情報を削除する"""
+    for index, item in enumerate(instructions):
+        if int(item.get('id', 0)) == instruction_id:
+            del instructions[index]
+            save_instructions()
+            return jsonify({'deleted_id': instruction_id}), 200
+
+    return jsonify({'error': '対象の発信情報が見つかりません。'}), 404
+
+
 @app.route('/api/disaster_markers', methods=['GET'])
 def api_get_disaster_markers():
     """災害マーカーの一覧を返す"""
@@ -911,7 +1032,6 @@ def api_create_disaster_marker():
 
 
 @app.route('/api/disaster_markers', methods=['PUT'])
-@login_required
 def api_replace_disaster_markers():
     """災害マーカーの一覧をまとめて保存する"""
     global disaster_markers
@@ -946,7 +1066,6 @@ def api_replace_disaster_markers():
 
 
 @app.route('/api/disaster_markers', methods=['DELETE'])
-@login_required
 def api_delete_disaster_marker():
     """災害マーカーを削除する"""
     payload = request.get_json(silent=True) or {}

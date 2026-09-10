@@ -59,6 +59,40 @@
     margin-top: 20px;
   }
 
+  .mode-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .mode-tab {
+    border: 1px solid #c3cbd7;
+    border-radius: 10px;
+    background: #eef2f7;
+    color: #374151;
+    padding: 10px 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .mode-tab.is-active {
+    background: linear-gradient(180deg, #0d5c96 0%, #0c4d86 100%);
+    border-color: #0c4d86;
+    color: #ffffff;
+  }
+
+  .mode-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .mode-panel[hidden] {
+    display: none;
+  }
+
   .form-field {
     display: flex;
     flex-direction: column;
@@ -222,6 +256,30 @@
     margin-top: 6px;
   }
 
+  .instruction-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .instruction-editor input,
+  .instruction-editor textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #c3cbd7;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: inherit;
+    background: #ffffff;
+  }
+
+  .instruction-editor__row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
   .primary-button,
   .secondary-button {
     border: none;
@@ -336,48 +394,76 @@
       <p class="page-subtitle">災害情報を登録して、地図上にアイコンを配置できます。</p>
 
       <form class="board-form" id="disasterForm">
-        <div class="form-field">
-          <label for="disasterName">災害情報</label>
-          <select id="disasterName" name="disasterName" aria-label="災害情報を選択">
-            <option value="河川洪水">🌊 河川洪水</option>
-            <option value="土砂災害">⛰ 土砂災害</option>
-            <option value="道路冠水">🚗 道路冠水</option>
-            <option value="道路寸断">🚧 道路寸断</option>
-            <option value="津波">🌊 津波</option>
-            <option value="獣害">🐾 獣害</option>
-          </select>
-          <div class="disaster-pin-preview disaster-pin-drop-zone" id="disasterPinPreview" aria-live="polite">
-            <span class="disaster-pin-preview__frame" aria-hidden="true">
-              <span class="disaster-pin-preview__pin" aria-hidden="true"></span>
-            </span>
-            <span class="disaster-pin-preview__label" id="disasterPinLabel">河川洪水</span>
+        <div class="mode-switch" role="tablist" aria-label="入力モード切替">
+          <button type="button" class="mode-tab is-active" data-mode="disaster" aria-selected="true">災害情報の入力</button>
+          <button type="button" class="mode-tab" data-mode="instruction" aria-selected="false">発信情報の入力</button>
+        </div>
+
+        <div class="mode-panel" data-mode-panel="disaster">
+          <div class="form-field">
+            <label for="disasterName">災害情報</label>
+            <select id="disasterName" name="disasterName" aria-label="災害情報を選択">
+              <option value="河川洪水">🌊 河川洪水</option>
+              <option value="土砂災害">⛰ 土砂災害</option>
+              <option value="道路冠水">🚗 道路冠水</option>
+              <option value="道路寸断">🚧 道路寸断</option>
+              <option value="津波">🌊 津波</option>
+              <option value="獣害">🐾 獣害</option>
+            </select>
+            <div class="disaster-pin-preview disaster-pin-drop-zone" id="disasterPinPreview" aria-live="polite">
+              <span class="disaster-pin-preview__frame" aria-hidden="true">
+                <span class="disaster-pin-preview__pin" aria-hidden="true"></span>
+              </span>
+              <span class="disaster-pin-preview__label" id="disasterPinLabel">河川洪水</span>
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label for="datetime">日時</label>
+            <input id="datetime" name="datetime" type="datetime-local" aria-label="日時を入力" />
+          </div>
+
+          <div class="form-field">
+            <label for="note">事項</label>
+            <textarea id="note" name="note" rows="4" aria-label="事項を入力" placeholder="例: 周辺道路の通行止めが発生しています"></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="scale">規模</label>
+            <select id="scale" name="scale" aria-label="規模を選択">
+              <option value="">選択してください</option>
+              <option value="小規模">小規模</option>
+              <option value="中規模">中規模</option>
+              <option value="大規模">大規模</option>
+            </select>
+            <div class="scale-note" id="scaleNote" hidden>規模を入力してください</div>
+          </div>
+
+          <div class="button-row">
+            <button type="button" class="primary-button" id="confirmButton">災害情報を保存</button>
+            <button type="button" class="secondary-button" id="deleteModeButton">削除モード</button>
           </div>
         </div>
 
-        <div class="form-field">
-          <label for="datetime">日時</label>
-          <input id="datetime" name="datetime" type="datetime-local" aria-label="日時を入力" />
-        </div>
+        <div class="mode-panel" data-mode-panel="instruction" hidden>
+          <div class="form-field">
+            <label for="instructionContent">発信内容</label>
+            <textarea id="instructionContent" name="instructionContent" rows="5" aria-label="発信内容を入力" placeholder="例: 〇〇地区の住民は避難を開始してください"></textarea>
+          </div>
 
-        <div class="form-field">
-          <label for="note">事項</label>
-          <textarea id="note" name="note" rows="4" aria-label="事項を入力" placeholder="例: 周辺道路の通行止めが発生しています"></textarea>
-        </div>
+          <div class="form-field">
+            <label for="instructionDistrict">該当地区</label>
+            <input id="instructionDistrict" name="instructionDistrict" type="text" aria-label="該当地区を入力" placeholder="例: 東地区" />
+          </div>
 
-        <div class="form-field">
-          <label for="scale">規模</label>
-          <select id="scale" name="scale" aria-label="規模を選択">
-            <option value="">選択してください</option>
-            <option value="小規模">小規模</option>
-            <option value="中規模">中規模</option>
-            <option value="大規模">大規模</option>
-          </select>
-          <div class="scale-note" id="scaleNote" hidden>規模を入力してください</div>
-        </div>
+          <div class="form-field">
+            <label for="instructionShelter">避難先</label>
+            <input id="instructionShelter" name="instructionShelter" type="text" aria-label="避難先を入力" placeholder="例: 東小学校" />
+          </div>
 
-        <div class="button-row">
-          <button type="button" class="primary-button" id="confirmButton">決定</button>
-          <button type="button" class="secondary-button" id="deleteModeButton">削除モード</button>
+          <div class="button-row">
+            <button type="button" class="primary-button" id="instructionSubmitButton">発信情報を保存</button>
+          </div>
         </div>
       </form>
     </aside>
@@ -388,7 +474,11 @@
   </div>
 
   <section class="board-results-panel" aria-label="発信一覧">
-    <h3 style="margin:0;">発信一覧</h3>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+      <h3 style="margin:0;">発信一覧</h3>
+      <button type="button" class="secondary-button" id="instructionEditToggle">編集モード</button>
+    </div>
+
     {% if instructions %}
       <table class="result-table">
         <thead>
@@ -398,8 +488,19 @@
         </thead>
         <tbody>
           {% for inst in instructions %}
-            <tr>
-              <td>{{ inst.content }}{% if inst.shelter %}（避難先: {{ inst.shelter }}）{% endif %}</td>
+            <tr data-instruction-id="{{ inst.id }}">
+              <td>
+                <div class="instruction-content-display">{{ inst.content }}{% if inst.shelter %}（避難先: {{ inst.shelter }}）{% endif %}</div>
+                <div class="instruction-editor" hidden>
+                  <input type="text" class="instruction-editor__content" value="{{ inst.content }}" aria-label="発信内容編集" />
+                  <input type="text" class="instruction-editor__district" value="{{ inst.district or inst.area or '' }}" aria-label="該当地区編集" placeholder="該当地区" />
+                  <input type="text" class="instruction-editor__shelter" value="{{ inst.shelter or '' }}" aria-label="避難先編集" placeholder="避難先" />
+                  <div class="instruction-editor__row">
+                    <button type="button" class="primary-button instruction-save-button">保存</button>
+                    <button type="button" class="secondary-button instruction-delete-button">削除</button>
+                  </div>
+                </div>
+              </td>
             </tr>
           {% endfor %}
         </tbody>
@@ -424,6 +525,13 @@
     const noteInput = document.getElementById('note');
     const deleteModeButton = document.getElementById('deleteModeButton');
     const confirmButton = document.getElementById('confirmButton');
+    const instructionSubmitButton = document.getElementById('instructionSubmitButton');
+    const instructionContentInput = document.getElementById('instructionContent');
+    const instructionDistrictInput = document.getElementById('instructionDistrict');
+    const instructionShelterInput = document.getElementById('instructionShelter');
+    const instructionEditToggle = document.getElementById('instructionEditToggle');
+    const modeTabs = Array.from(document.querySelectorAll('.mode-tab'));
+    const modePanels = Array.from(document.querySelectorAll('[data-mode-panel]'));
 
     const initialCenter = [40.8244, 140.7400];
     const initialZoom = 12;
@@ -538,6 +646,21 @@
       const scaleSelected = Boolean(scaleSelect.value);
       scaleNote.hidden = scaleSelected;
       updateDisasterPinPreview();
+    }
+
+    function setMode(mode) {
+      const nextMode = mode === 'instruction' ? 'instruction' : 'disaster';
+
+      modeTabs.forEach(function (tab) {
+        const active = tab.dataset.mode === nextMode;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+
+      modePanels.forEach(function (panel) {
+        const active = panel.dataset.modePanel === nextMode;
+        panel.hidden = !active;
+      });
     }
 
     function renderMarkers() {
@@ -793,8 +916,149 @@
       deleteModeButton.textContent = deleteMode ? '削除モード解除' : '削除モード';
     });
 
+    modeTabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        setMode(tab.dataset.mode || 'disaster');
+      });
+    });
+
+    instructionSubmitButton.addEventListener('click', async function () {
+      const content = instructionContentInput.value.trim();
+      if (!content) {
+        alert('発信内容を入力してください');
+        instructionContentInput.focus();
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/instructions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            content: content,
+            district: instructionDistrictInput.value.trim(),
+            shelter: instructionShelterInput.value.trim()
+          })
+        });
+
+        const data = await response.json().catch(function () {
+          return {};
+        });
+
+        if (!response.ok) {
+          throw new Error(data.error || '発信情報の保存に失敗しました');
+        }
+
+        alert('発信情報を保存しました');
+        window.location.href = '/';
+      } catch (error) {
+        alert(error.message || '発信情報の保存に失敗しました');
+      }
+    });
+
+    instructionEditToggle.addEventListener('click', function () {
+      const editors = document.querySelectorAll('.instruction-editor');
+      const isHidden = editors[0] ? editors[0].hidden : true;
+      editors.forEach(function (editor) {
+        editor.hidden = !isHidden;
+      });
+
+      const displayItems = document.querySelectorAll('.instruction-content-display');
+      displayItems.forEach(function (item) {
+        item.hidden = !isHidden;
+      });
+
+      instructionEditToggle.textContent = isHidden ? '編集モード解除' : '編集モード';
+    });
+
+    document.addEventListener('click', async function (event) {
+      const saveButton = event.target.closest('.instruction-save-button');
+      if (saveButton) {
+        const row = saveButton.closest('tr[data-instruction-id]');
+        if (!row) {
+          return;
+        }
+
+        const instructionId = Number(row.dataset.instructionId);
+        const editor = row.querySelector('.instruction-editor');
+        const contentInput = row.querySelector('.instruction-editor__content');
+        const districtInput = row.querySelector('.instruction-editor__district');
+        const shelterInput = row.querySelector('.instruction-editor__shelter');
+
+        const content = contentInput.value.trim();
+        if (!content) {
+          alert('発信内容を入力してください');
+          contentInput.focus();
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/instructions/' + instructionId, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              content: content,
+              district: districtInput.value.trim(),
+              shelter: shelterInput.value.trim()
+            })
+          });
+
+          const data = await response.json().catch(function () {
+            return {};
+          });
+
+          if (!response.ok) {
+            throw new Error(data.error || '更新に失敗しました');
+          }
+
+          alert('発信情報を更新しました');
+          window.location.href = '/';
+        } catch (error) {
+          alert(error.message || '更新に失敗しました');
+        }
+      }
+
+      const deleteButton = event.target.closest('.instruction-delete-button');
+      if (deleteButton) {
+        const row = deleteButton.closest('tr[data-instruction-id]');
+        if (!row) {
+          return;
+        }
+
+        const instructionId = Number(row.dataset.instructionId);
+        const confirmed = window.confirm('この発信情報を削除しますか？');
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/instructions/' + instructionId, {
+            method: 'DELETE'
+          });
+
+          const data = await response.json().catch(function () {
+            return {};
+          });
+
+          if (!response.ok) {
+            throw new Error(data.error || '削除に失敗しました');
+          }
+
+          alert('発信情報を削除しました');
+          window.location.href = '/';
+        } catch (error) {
+          alert(error.message || '削除に失敗しました');
+        }
+      }
+    });
+
     datetimeInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     updateScaleNote();
+    setMode('disaster');
     renderMarkers();
   });
 </script>

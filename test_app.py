@@ -1,4 +1,6 @@
+import json
 import re
+import pathlib
 import unittest
 
 import app as shelter_app
@@ -7,15 +9,25 @@ import app as shelter_app
 class ShelterAppTests(unittest.TestCase):
     def setUp(self):
         self.original_shelters = [dict(item) for item in shelter_app.shelters]
+        self.original_instructions = [dict(item) for item in shelter_app.instructions]
+        self.original_disaster_markers = [dict(item) for item in shelter_app.disaster_markers]
+        self.original_instructions_file = pathlib.Path(shelter_app.INSTRUCTIONS_FILE).read_text(encoding='utf-8')
+        self.original_disaster_markers_file = pathlib.Path(shelter_app.DISASTER_MARKERS_FILE).read_text(encoding='utf-8')
         shelter_app.shelters[:] = [
             {"id": 1, "name": "A", "capacity": 10, "current": 8},
             {"id": 2, "name": "B", "capacity": 20, "current": 0},
             {"id": 3, "name": "C", "capacity": 15, "current": 4},
         ]
+        shelter_app.instructions[:] = [dict(item) for item in self.original_instructions]
+        shelter_app.disaster_markers[:] = [dict(item) for item in self.original_disaster_markers]
         self.client = shelter_app.app.test_client()
 
     def tearDown(self):
         shelter_app.shelters[:] = self.original_shelters
+        shelter_app.instructions[:] = self.original_instructions
+        shelter_app.disaster_markers[:] = self.original_disaster_markers
+        pathlib.Path(shelter_app.INSTRUCTIONS_FILE).write_text(self.original_instructions_file, encoding='utf-8')
+        pathlib.Path(shelter_app.DISASTER_MARKERS_FILE).write_text(self.original_disaster_markers_file, encoding='utf-8')
 
     def get_shelter_names(self, html):
         rows = re.findall(r'<tr[^>]*>\s*<td[^>]*>(.*?)</td>', html, flags=re.DOTALL)
@@ -181,6 +193,88 @@ class ShelterAppTests(unittest.TestCase):
         self.assertIn('disaster-pin-drop-zone', html)
         self.assertIn('🌊 河川洪水', html)
         self.assertIn('⛰ 土砂災害', html)
+
+    def test_board_page_has_instruction_input_toggle(self):
+        response = self.client.get('/board')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('災害情報の入力', html)
+        self.assertIn('発信情報の入力', html)
+        self.assertIn('instructionContent', html)
+
+    def test_home_page_defines_disaster_marker_style(self):
+        response = self.client.get('/')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('.map-disaster-shape', html)
+
+    def test_all_map_templates_include_disaster_inner_icon_markup(self):
+        templates = [
+            pathlib.Path('bousai_app/templates/index.html').read_text(encoding='utf-8'),
+            pathlib.Path('bousai_app/templates/search_results.html').read_text(encoding='utf-8'),
+            pathlib.Path('bousai_app/templates/shelter_search.html').read_text(encoding='utf-8'),
+            pathlib.Path('bousai_app/templates/board.html').read_text(encoding='utf-8'),
+        ]
+
+        self.assertTrue(all('map-disaster-inner' in text for text in templates[:3]))
+        self.assertIn('disaster-marker-inner', templates[3])
+
+    def test_shelter_search_page_defines_disaster_marker_css(self):
+        html = pathlib.Path('bousai_app/templates/shelter_search.html').read_text(encoding='utf-8')
+
+        self.assertIn('.map-disaster-icon {', html)
+        self.assertIn('.map-disaster-shape {', html)
+        self.assertIn('.map-disaster-inner {', html)
+
+    def test_all_map_templates_use_disaster_name_color_mapping(self):
+        templates = [
+            pathlib.Path('bousai_app/templates/index.html').read_text(encoding='utf-8'),
+            pathlib.Path('bousai_app/templates/search_results.html').read_text(encoding='utf-8'),
+            pathlib.Path('bousai_app/templates/shelter_search.html').read_text(encoding='utf-8'),
+        ]
+
+        self.assertTrue(all('function getDisasterColor(disasterName)' in html for html in templates))
+        self.assertTrue(all('getDisasterScaleColor' not in html for html in templates))
+
+    def test_api_instructions_creates_active_instruction(self):
+        response = self.client.post(
+            '/api/instructions',
+            json={
+                'content': '避難指示を出します',
+                'district': '東地区',
+                'shelter': '東小学校'
+            }
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(shelter_app.instructions[-1]['content'], '避難指示を出します')
+        self.assertEqual(shelter_app.instructions[-1]['district'], '東地区')
+        self.assertEqual(shelter_app.instructions[-1]['target'], '住民')
+
+    def test_disaster_markers_can_be_saved_publicly_and_loaded_for_other_maps(self):
+        response = self.client.put(
+            '/api/disaster_markers',
+            json=[{
+                'id': 1,
+                'latitude': 40.8244,
+                'longitude': 140.7400,
+                'name': '河川洪水',
+                'scale': '小規模',
+                'datetime': '2026-09-10T12:00',
+                'note': 'テスト用災害情報',
+                'address': '青森市'
+            }]
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(shelter_app.disaster_markers[0]['name'], '河川洪水')
+
+        fetch_response = self.client.get('/api/disaster_markers')
+        self.assertEqual(fetch_response.status_code, 200)
+        payload = json.loads(fetch_response.get_data(as_text=True))
+        self.assertEqual(payload[0]['name'], '河川洪水')
 
     def test_board_page_is_public(self):
         response = self.client.get('/board')
