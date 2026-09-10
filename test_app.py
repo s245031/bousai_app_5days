@@ -28,13 +28,27 @@ class ShelterAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.get_shelter_names(html), ['B', 'C', 'A'])
 
-    def test_shelter_search_page_has_only_remaining_desc_link(self):
+    def test_shelter_search_page_has_search_controls_and_results(self):
         response = self.client.get('/shelter_search')
         html = response.get_data(as_text=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn('残り空き人数が多い順', html)
-        self.assertNotIn('残り空き人数が少ない順', html)
+        self.assertIn('避難所検索', html)
+        self.assertIn('避難所を選んだ基準の順に表示します', html)
+        self.assertIn('name="conditions"', html)
+        self.assertIn('最も重視する条件', html)
+        self.assertIn('A', html)
+        self.assertIn('B', html)
+        self.assertIn('C', html)
+
+    def test_shelter_search_keeps_sort_and_district_params(self):
+        response = self.client.get('/shelter_search?sort=occupancy&district=A')
+        html = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('value="occupancy"', html)
+        self.assertIn('name="district"', html)
+        self.assertIn('避難所検索', html)
 
     def test_full_shelters_are_not_hidden_from_search_results(self):
         shelter_app.shelters[0] = {"id": 1, "name": "A", "capacity": 10, "current": 10}

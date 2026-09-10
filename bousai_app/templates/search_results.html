@@ -50,6 +50,35 @@
     color: #4b5563;
   }
 
+  .shelter-pin-icon {
+    background: transparent;
+    border: none;
+  }
+
+  .shelter-pin-marker {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border: 2px solid #ffffff;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    position: relative;
+    top: 2px;
+    left: 2px;
+  }
+
+  .shelter-pin-marker::after {
+    content: "";
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.75);
+    top: 5px;
+    left: 5px;
+  }
+
   @media (max-width: 900px) {
     .results-layout {
       display: block;
@@ -148,12 +177,16 @@
         fillColor = '#f4b400';
       }
 
-      const marker = L.circleMarker([shelter.lat, shelter.lng], {
-        radius: 7,
-        color: '#ffffff',
-        weight: 2,
-        fillColor: fillColor,
-        fillOpacity: 0.95
+      const markerIcon = L.divIcon({
+        className: 'shelter-pin-icon',
+        html: '<span class="shelter-pin-marker" style="background-color: ' + fillColor + ';"></span>',
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+        popupAnchor: [0, -32]
+      });
+
+      const marker = L.marker([shelter.lat, shelter.lng], {
+        icon: markerIcon
       }).addTo(map);
 
       marker.bindTooltip(shelter.name, {

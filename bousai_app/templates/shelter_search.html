@@ -1,11 +1,496 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>避難所検索</h2>
-<p>登録されている避難所を確認できます。</p>
+<style>
+  .shelter-search-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
 
-<p>
-  <a href="/all_shelters">全施設一覧</a> |
-  <a href="/search_results?sort=remaining_desc">残り空き人数が多い順</a>
-</p>
+  .shelter-search-layout {
+    display: flex;
+    gap: 24px;
+    align-items: stretch;
+  }
+
+  .search-panel,
+  .map-panel,
+  .results-panel {
+    background: #ffffff;
+    border: 1px solid #d9dde4;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .map-panel {
+    flex: 1.2 1 60%;
+    min-height: 420px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #dff1f9 0%, #c7e7f4 100%);
+    position: relative;
+  }
+
+  #shelterMap {
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    background: #d8edf7;
+  }
+
+  .search-panel {
+    flex: 0 0 360px;
+    padding: 24px;
+  }
+
+  .results-panel {
+    padding: 24px;
+  }
+
+  .search-title {
+    margin: 0 0 12px;
+    font-size: 1.8rem;
+  }
+
+  .warning-box {
+    background: #fff5e6;
+    border: 1px solid #f5c07b;
+    color: #774d00;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 0.92rem;
+    margin-bottom: 18px;
+  }
+
+  .search-help {
+    font-size: 0.94rem;
+    color: #4b5563;
+    margin-bottom: 16px;
+  }
+
+  .sort-select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #c3cbd7;
+    font-size: 1rem;
+    margin-bottom: 18px;
+    background: white;
+  }
+
+  .search-button {
+    width: 100%;
+    border: none;
+    border-radius: 12px;
+    background: #0d5c96;
+    color: white;
+    font-weight: 700;
+    padding: 12px 18px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  .search-button:hover,
+  .search-button:focus-visible {
+    background: #0b4a80;
+  }
+
+  .condition-guide {
+    margin-top: 20px;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 18px;
+  }
+
+  .guide-header {
+    margin: 0 0 14px;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .guide-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .choice-button {
+    border: 1px solid #0d5c96;
+    background: #edf6ff;
+    color: #0d5c96;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .choice-button:hover,
+  .choice-button:focus-visible {
+    background: #d9ebff;
+  }
+
+  .choice-button.is-selected {
+    display: none;
+  }
+
+  .history {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 80px;
+    margin-top: 8px;
+  }
+
+  .history-item {
+    background: #f3f4f6;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.93rem;
+    line-height: 1.4;
+    color: #1f2937;
+  }
+
+  .history-item strong {
+    color: #0d5c96;
+  }
+
+  .history-item.is-prompt {
+    background: #edf6ff;
+    border-left: 4px solid #0d5c96;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .results-count {
+    font-size: 0.96rem;
+    color: #4b5563;
+  }
+
+  .results-table-wrap {
+    overflow-x: auto;
+  }
+
+  table.result-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  table.result-table th,
+  table.result-table td {
+    border: 1px solid #d9dde4;
+    padding: 10px 8px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+  }
+
+  table.result-table th {
+    background: #eff6ff;
+    font-size: 0.92rem;
+  }
+
+  table.result-table td {
+    background-color: #ffffff;
+  }
+
+  .result-note {
+    margin-top: 12px;
+    font-size: 0.92rem;
+    color: #4b5563;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1f2937;
+    background: #e5e7eb;
+  }
+
+  .status-pill--low {
+    background: #fce7e7;
+    color: #b42318;
+  }
+
+  .status-pill--mid {
+    background: #fff7d6;
+    color: #8a5c00;
+  }
+
+  .status-pill--high {
+    background: #eaf6ee;
+    color: #186a3b;
+  }
+
+  @media (max-width: 900px) {
+    .shelter-search-layout {
+      display: block;
+    }
+
+    .search-panel,
+    .map-panel,
+    .results-panel {
+      width: 100%;
+      margin-bottom: 18px;
+    }
+  }
+</style>
+
+<div class="shelter-search-page">
+  <div class="shelter-search-layout">
+    <section class="map-panel" aria-label="避難所地図">
+      <div id="shelterMap" aria-label="避難所マップ"></div>
+    </section>
+
+    <aside class="search-panel" aria-label="避難所検索フォーム">
+      <h2 class="search-title">避難所検索</h2>
+
+      <div class="warning-box" role="note">
+        緊急時のため、現在の状況と避難先の条件を優先して確認してください。
+      </div>
+
+      <p class="search-help">避難所を選んだ基準の順に表示します</p>
+
+      <form id="shelterSearchForm" method="get" action="/shelter_search">
+        <label for="district" class="sr-only" style="position:absolute; left:-10000px;">地区</label>
+        <input id="district" name="district" type="text" value="{{ district or '' }}" placeholder="地区名で絞り込み" style="width:100%; box-sizing:border-box; padding:10px 12px; border-radius:10px; border:1px solid #c3cbd7; margin-bottom:16px;" aria-label="地区名で絞り込み" />
+
+        <label for="sort" style="display:block; margin-bottom:6px; font-weight:600;">表示基準</label>
+        <select id="sort" name="sort" class="sort-select" aria-label="表示基準を選択">
+          <option value="">▼ 選択してください</option>
+          <option value="distance" {% if sort == 'distance' %}selected{% endif %}>避難所までの距離が近い順</option>
+          <option value="occupancy" {% if sort == 'occupancy' %}selected{% endif %}>収容可能数に対する避難者率が低い順</option>
+          <option value="facilities" {% if sort == 'facilities' %}selected{% endif %}>設備が良い順</option>
+        </select>
+
+        <input type="hidden" name="conditions" id="conditions" value="{{ conditions|join(',') if conditions else '' }}" />
+        <button type="submit" class="search-button" aria-label="避難所を検索">検索</button>
+      </form>
+
+      <div class="condition-guide" aria-live="polite">
+        <h3 class="guide-header">最も重視する条件</h3>
+
+        <div class="guide-choices" aria-label="条件選択肢">
+          <button type="button" class="choice-button" data-condition="distance" {% if 'distance' in conditions %}disabled aria-hidden="true"{% endif %}>家からの距離</button>
+          <button type="button" class="choice-button" data-condition="gender" {% if 'gender' in conditions %}disabled aria-hidden="true"{% endif %}>男女比</button>
+          <button type="button" class="choice-button" data-condition="facilities" {% if 'facilities' in conditions %}disabled aria-hidden="true"{% endif %}>設備</button>
+          <button type="button" class="choice-button" data-condition="occupancy" {% if 'occupancy' in conditions %}disabled aria-hidden="true"{% endif %}>現在の収容者数</button>
+        </div>
+
+        <div class="history" id="conditionHistory" aria-live="polite">
+          <div class="history-item is-prompt"><strong>避難所に最も求めることは何ですか？</strong></div>
+          {% for condition in conditions %}
+            <div class="history-item"><strong>選択済み:</strong> {{ condition }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <section class="results-panel" aria-label="避難所検索結果">
+    <div class="results-header">
+      <h3 style="margin:0;">検索結果</h3>
+      <div class="results-count">{{ results|length }}件</div>
+    </div>
+
+    {% if results %}
+      <div class="results-table-wrap">
+        <table class="result-table" aria-label="避難所一覧">
+          <thead>
+            <tr>
+              <th>避難所名</th>
+              <th>距離</th>
+              <th>収容者率</th>
+              <th>設備</th>
+              <th>最大受け入れ可能人数</th>
+              <th>現在の受け入れ人数</th>
+              <th>残り人数</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for shelter in results %}
+              {% set capacity = shelter.capacity|default(0) %}
+              {% set current = shelter.current|default(0) %}
+              {% set remaining = capacity - current if capacity else 0 %}
+              {% set occupancy_rate = shelter.occupancy_rate %}
+              {% set distance = shelter.distance %}
+              {% set facility_score = shelter.facility_score %}
+              <tr>
+                <td>{{ shelter.name }}</td>
+                <td>{{ '%.1f'|format(distance) if distance is not none else '未設定' }}</td>
+                <td>{{ '%.0f'|format((occupancy_rate * 100)) if occupancy_rate is not none else '未設定' }}%</td>
+                <td>{{ facility_score if facility_score is not none else '未設定' }}</td>
+                <td>{{ capacity }}人</td>
+                <td>{{ current }}人</td>
+                <td>{{ remaining }}人</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="result-note">該当する避難所が見つかりませんでした</p>
+    {% endif %}
+  </section>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const sheltersData = {{ results | tojson | safe }};
+    const mapEl = document.getElementById('shelterMap');
+    const form = document.getElementById('shelterSearchForm');
+    const sortSelect = document.getElementById('sort');
+    const conditionsInput = document.getElementById('conditions');
+    const historyEl = document.getElementById('conditionHistory');
+    const conditionButtons = Array.from(document.querySelectorAll('.choice-button'));
+
+    const defaultCenter = [40.823, 140.745];
+    const map = L.map('shelterMap').setView(defaultCenter, 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const markerLayer = L.layerGroup().addTo(map);
+
+    if (!mapEl) {
+      return;
+    }
+
+    const filterValidMarkers = sheltersData.filter(function (shelter) {
+      return shelter && shelter.lat !== undefined && shelter.lng !== undefined && shelter.lat !== null && shelter.lng !== null;
+    });
+
+    function getColorByRemainingRate(rate) {
+      if (rate <= 30) return '#d32f2f';
+      if (rate <= 70) return '#f4b400';
+      return '#2e7d32';
+    }
+
+    filterValidMarkers.forEach(function (shelter) {
+      const capacity = Number(shelter.capacity || 0);
+      const current = Number(shelter.current || 0);
+      const remaining = Math.max(capacity - current, 0);
+      const rate = capacity ? Math.round((remaining / capacity) * 100) : 0;
+
+      const pinHtml = '<span class="shelter-pin-marker" style="background-color: ' + getColorByRemainingRate(rate) + ';"></span>';
+      const markerIcon = L.divIcon({
+        className: 'shelter-pin-icon',
+        html: pinHtml,
+        iconSize: [28, 36],
+        iconAnchor: [14, 36],
+        popupAnchor: [0, -32]
+      });
+
+      const marker = L.marker([shelter.lat, shelter.lng], { icon: markerIcon }).addTo(markerLayer);
+      marker.bindPopup(
+        '<strong>' + (shelter.name || '避難所') + '</strong><br>' +
+        '最大受け入れ可能人数: ' + capacity + '人<br>' +
+        '現在の受け入れ人数: ' + current + '人<br>' +
+        '残り人数: ' + remaining + '人'
+      );
+      marker.bindTooltip(shelter.name || '避難所', { direction: 'top', opacity: 0.95 });
+    });
+
+    if (filterValidMarkers.length > 0) {
+      const bounds = L.latLngBounds(filterValidMarkers.map(function (shelter) {
+        return [shelter.lat, shelter.lng];
+      }));
+      map.fitBounds(bounds, { padding: [20, 20] });
+    }
+
+    const submitConditions = [];
+    const selectedConditions = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
+      return value.trim();
+    }).filter(Boolean)));
+
+    function syncHistory() {
+      const currentConditions = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
+        return value.trim();
+      }).filter(Boolean)));
+
+      const historyItems = [
+        '<div class="history-item is-prompt"><strong>避難所に最も求めることは何ですか？</strong></div>'
+      ];
+
+      currentConditions.forEach(function (condition) {
+        historyItems.push('<div class="history-item"><strong>選択済み:</strong> ' + condition + '</div>');
+      });
+
+      historyEl.innerHTML = historyItems.join('');
+
+      conditionButtons.forEach(function (button) {
+        const condition = button.dataset.condition;
+        const isSelected = currentConditions.includes(condition);
+        button.disabled = isSelected;
+        button.setAttribute('aria-hidden', isSelected ? 'true' : 'false');
+        button.classList.toggle('is-selected', isSelected);
+      });
+    }
+
+    function submitSearch(event) {
+      const selectedList = Array.from(new Set((conditionsInput.value || '').split(',').map(function (value) {
+        return value.trim();
+      }).filter(Boolean)));
+      const hasDuplicate = selectedList.length !== (conditionsInput.value || '').split(',').filter(function (value) {
+        return value.trim();
+      }).length;
+
+      if (hasDuplicate) {
+        conditionsInput.value = selectedList.join(',');
+      }
+
+      if (event && event.type === 'click') {
+        form.submit();
+      }
+    }
+
+    conditionButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        const condition = button.dataset.condition;
+        if (!condition || selectedConditions.includes(condition)) {
+          return;
+        }
+
+        selectedConditions.push(condition);
+        conditionsInput.value = selectedConditions.join(',');
+        syncHistory();
+
+        const remainingButtons = conditionButtons.filter(function (candidate) {
+          return candidate.dataset.condition !== condition && !selectedConditions.includes(candidate.dataset.condition);
+        });
+
+        if (remainingButtons.length === 0) {
+          form.submit();
+        }
+      });
+    });
+
+    sortSelect.addEventListener('change', function () {
+      form.submit();
+    });
+
+    form.addEventListener('submit', function (event) {
+      if (conditionsInput.value) {
+        const uniqueConditions = Array.from(new Set(conditionsInput.value.split(',').map(function (value) {
+          return value.trim();
+        }).filter(Boolean)));
+        conditionsInput.value = uniqueConditions.join(',');
+      }
+    });
+
+    syncHistory();
+  });
+</script>
 {% endblock %}

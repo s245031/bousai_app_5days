@@ -84,6 +84,8 @@ WARNING_CODES = {
 # サンプルデータの読み込み
 DATA_FILE = os.path.join(APP_DIR, 'data', 'shelters.json')
 INSTRUCTIONS_FILE = os.path.join(APP_DIR, 'data', 'instructions.json')
+DISASTER_MARKERS_FILE = os.path.join(APP_DIR, 'data', 'disaster_markers.json')
+VALID_DISASTER_SCALES = ('小規模', '中規模', '大規模')
 
 def load_json(path, default):
     """JSONファイルを読み込む（存在しない・壊れている場合は default を返す）"""
@@ -95,6 +97,7 @@ def load_json(path, default):
 
 shelters = load_json(DATA_FILE, [])
 instructions = load_json(INSTRUCTIONS_FILE, [])
+disaster_markers = []
 
 
 def get_default_shelter_coordinates(shelter=None, index=0):
@@ -137,6 +140,57 @@ def save_shelters():
             json.dump(shelters, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+
+
+def normalize_disaster_marker(marker):
+    """災害マーカーの保存データを既存データに合わせて正規化する"""
+    if not isinstance(marker, dict):
+        return None
+
+    try:
+        latitude = float(marker.get('latitude', 0))
+    except (TypeError, ValueError):
+        latitude = 0.0
+
+    try:
+        longitude = float(marker.get('longitude', 0))
+    except (TypeError, ValueError):
+        longitude = 0.0
+
+    normalized = {
+        'id': marker.get('id', 0),
+        'latitude': latitude,
+        'longitude': longitude,
+        'icon': marker.get('icon') or '⚠',
+        'name': marker.get('name') or '災害情報',
+        'scale': marker.get('scale') if marker.get('scale') in VALID_DISASTER_SCALES else '',
+        'datetime': marker.get('datetime') or '',
+        'note': marker.get('note') or '',
+        'address': marker.get('address') or marker.get('area') or '未取得'
+    }
+    return normalized
+
+
+def load_disaster_markers():
+    raw_markers = load_json(DISASTER_MARKERS_FILE, [])
+    normalized_markers = []
+    for marker in raw_markers:
+        normalized = normalize_disaster_marker(marker)
+        if normalized:
+            normalized_markers.append(normalized)
+    return normalized_markers
+
+
+def save_disaster_markers():
+    """災害マーカーをJSONファイルに保存する"""
+    try:
+        with open(DISASTER_MARKERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(disaster_markers, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+disaster_markers = load_disaster_markers()
 # ────────────────────────────────
 
 # ────────────────────────────────
@@ -190,9 +244,65 @@ def remaining_capacity(shelter):
     return max(capacity - current, 0)
 
 
+def get_occupancy_rate(shelter):
+    """避難者率を計算する。capacity が 0 なら欠損扱いにする。"""
+    capacity = to_int(shelter.get('capacity'), 0)
+    if capacity <= 0:
+        return None
+
+    current = to_int(shelter.get('current'), 0)
+    return round(current / capacity, 4)
+
+
+def get_distance_value(shelter):
+    """distance を安全に取り出す。"""
+    try:
+        value = float(shelter.get('distance'))
+    except (TypeError, ValueError):
+        return None
+
+    if value < 0:
+        return None
+    return value
+
+
+def get_facility_score(shelter):
+    """facility_score を安全に取り出す。"""
+    try:
+        value = float(shelter.get('facility_score'))
+    except (TypeError, ValueError):
+        return None
+
+    if value < 0:
+        return None
+    return value
+
+
+def build_search_results(results):
+    """検索画面で使う値を補完する。"""
+    formatted = []
+    for shelter in results:
+        item = dict(shelter)
+        item['occupancy_rate'] = get_occupancy_rate(item)
+        item['distance'] = get_distance_value(item)
+        item['facility_score'] = get_facility_score(item)
+        formatted.append(item)
+    return formatted
+
+
 def filter_shelters(district=None, sort=None, only_available=False):
     """district 指定があれば一致する避難所のみ、必要なら並び替えする"""
-    results = [s for s in shelters if not district or s.get('district') == district]
+    results = []
+    for shelter in shelters:
+        item = dict(shelter)
+        item['occupancy_rate'] = get_occupancy_rate(item)
+        item['distance'] = get_distance_value(item)
+        item['facility_score'] = get_facility_score(item)
+
+        if district and district.strip() and item.get('district') != district.strip():
+            continue
+
+        results.append(item)
 
     if only_available:
         results = [s for s in results if remaining_capacity(s) > 0]
@@ -205,8 +315,56 @@ def filter_shelters(district=None, sort=None, only_available=False):
         return sorted(results, key=lambda s: (remaining_capacity(s), s.get('name', '')))
     if sort == 'remaining_desc':
         return sorted(results, key=lambda s: (-remaining_capacity(s), s.get('name', '')))
+    if sort == 'distance':
+        return sorted(
+            results,
+            key=lambda s: (
+                s.get('distance') is None,
+                s.get('distance') if s.get('distance') is not None else float('inf'),
+                s.get('name', '')
+            )
+        )
+    if sort == 'occupancy':
+        return sorted(
+            results,
+            key=lambda s: (
+                s.get('occupancy_rate') is None,
+                s.get('occupancy_rate') if s.get('occupancy_rate') is not None else float('inf'),
+                s.get('name', '')
+            )
+        )
+    if sort == 'facilities':
+        return sorted(
+            results,
+            key=lambda s: (
+                s.get('facility_score') is None,
+                -(s.get('facility_score') if s.get('facility_score') is not None else 0),
+                s.get('name', '')
+            )
+        )
 
     return results
+
+
+def get_next_disaster_marker_id():
+    """災害マーカーのIDを次へ進める"""
+    if not disaster_markers:
+        return 1
+    return max(int(marker.get('id', 0)) for marker in disaster_markers) + 1
+
+
+def parse_conditions(raw_conditions):
+    """カンマ区切りの条件文字列を安全に配列に変換する"""
+    if not raw_conditions:
+        return []
+
+    valid_conditions = {'distance', 'gender', 'facilities', 'occupancy'}
+    conditions = []
+    for part in raw_conditions.split(','):
+        cleaned = part.strip()
+        if cleaned and cleaned in valid_conditions and cleaned not in conditions:
+            conditions.append(cleaned)
+    return conditions
 
 
 def get_shelter_by_id(shelter_id):
@@ -343,7 +501,15 @@ def get_weather_warnings():
 @app.route('/')
 def index():
     resident_notices = [i for i in instructions if i.get('target') == '住民']
-    return render_template('index.html', resident_notices=resident_notices)
+    active_instructions = [
+        i for i in resident_notices
+        if i.get('status') not in ('解除', '完了')
+    ]
+    return render_template(
+        'index.html',
+        resident_notices=resident_notices,
+        active_instructions=active_instructions
+    )
 
 # ログインページ
 @app.route('/login', methods=['GET', 'POST'])
@@ -528,7 +694,19 @@ def shelter_edit(shelter_id):
 # 避難所検索ページ
 @app.route('/shelter_search')
 def shelter_search():
-    return render_template('shelter_search.html')
+    district = request.args.get('district', '')
+    sort = request.args.get('sort', '')
+    conditions = parse_conditions(request.args.get('conditions', ''))
+
+    results = filter_shelters(district=district or None, sort=sort or None, only_available=False)
+
+    return render_template(
+        'shelter_search.html',
+        results=results,
+        district=district,
+        sort=sort,
+        conditions=conditions
+    )
 
 # 全施設一覧ページ
 @app.route('/all_shelters')
@@ -541,7 +719,7 @@ def all_shelters():
 @app.route('/board')
 def board():
     resident_instructions = [i for i in instructions if i.get('target') == '住民']
-    return render_template('board.html', instructions=resident_instructions)
+    return render_template('board.html', instructions=resident_instructions, disaster_markers=disaster_markers)
 
 # 検索結果ページ：templates/search_results.html を返す
 @app.route('/search_results')
@@ -569,6 +747,73 @@ def get_shelters():
 def api_weather_warnings():
     """気象警報・注意報をJSON形式で返すAPI"""
     return jsonify(get_weather_warnings())
+
+
+@app.route('/api/disaster_markers', methods=['GET'])
+def api_get_disaster_markers():
+    """災害マーカーの一覧を返す"""
+    return jsonify(disaster_markers)
+
+
+@app.route('/api/disaster_markers', methods=['POST'])
+@login_required
+def api_create_disaster_marker():
+    """災害マーカーを保存する"""
+    payload = request.get_json(silent=True) or {}
+
+    if not isinstance(payload, dict):
+        return jsonify({'error': 'リクエストが不正です。'}), 400
+
+    scale = (payload.get('scale') or '').strip()
+    if scale not in VALID_DISASTER_SCALES:
+        return jsonify({'error': '規模を入力してください。'}), 400
+
+    try:
+        latitude = float(payload.get('latitude'))
+        longitude = float(payload.get('longitude'))
+    except (TypeError, ValueError):
+        return jsonify({'error': '緯度と経度を正しく指定してください。'}), 400
+
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        return jsonify({'error': '緯度と経度の範囲が不正です。'}), 400
+
+    marker = normalize_disaster_marker({
+        'id': get_next_disaster_marker_id(),
+        'latitude': latitude,
+        'longitude': longitude,
+        'icon': payload.get('icon') or '⚠',
+        'name': payload.get('name') or '災害情報',
+        'scale': scale,
+        'datetime': payload.get('datetime') or '',
+        'note': payload.get('note') or '',
+        'address': payload.get('address') or payload.get('area') or '未取得'
+    })
+
+    disaster_markers.append(marker)
+    save_disaster_markers()
+    return jsonify(marker), 201
+
+
+@app.route('/api/disaster_markers', methods=['DELETE'])
+@login_required
+def api_delete_disaster_marker():
+    """災害マーカーを削除する"""
+    payload = request.get_json(silent=True) or {}
+    try:
+        marker_id = int(payload.get('id'))
+    except (TypeError, ValueError):
+        return jsonify({'error': '削除対象IDが不正です。'}), 400
+
+    global disaster_markers
+
+    for index, marker in enumerate(disaster_markers):
+        if int(marker.get('id', 0)) == marker_id:
+            del disaster_markers[index]
+            save_disaster_markers()
+            return jsonify({'deleted_id': marker_id}), 200
+
+    return jsonify({'error': '対象の災害マーカーが見つかりません。'}), 404
+
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

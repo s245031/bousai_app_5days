@@ -3,23 +3,597 @@
 {% block title %}指示・発信ボード - 防災アプリ{% endblock %}
 
 {% block content %}
-<h2>発信ボード</h2>
-<p>住民向けの発信を登録・確認できます。</p>
+<style>
+  .board-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
 
-<!-- 発信一覧 -->
-<h3>発信一覧</h3>
-{% if instructions %}
-<table border="1" cellpadding="5">
-  <tr>
-    <th>内容</th>
-  </tr>
-  {% for inst in instructions %}
-  <tr>
-    <td>{{ inst.content }}{% if inst.shelter %}（避難先: {{ inst.shelter }}）{% endif %}</td>
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p>登録されている指示はありません。</p>
-{% endif %}
+  .board-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .board-form-panel,
+  .board-map-panel,
+  .board-results-panel {
+    background: #ffffff;
+    border: 1px solid #d9dde4;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  }
+
+  .board-form-panel {
+    flex: 0 0 380px;
+    padding: 24px;
+  }
+
+  .board-map-panel {
+    flex: 1 1 auto;
+    min-height: 520px;
+    padding: 18px;
+    background: linear-gradient(180deg, #dff1f9 0%, #c7e7f4 100%);
+    overflow: hidden;
+  }
+
+  .board-results-panel {
+    padding: 24px;
+  }
+
+  .page-heading {
+    margin: 0;
+    font-size: 1.8rem;
+  }
+
+  .page-subtitle {
+    margin: 8px 0 0;
+    color: #4b5563;
+  }
+
+  .board-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 20px;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-field label {
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #c3cbd7;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: inherit;
+    background: #ffffff;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .icon-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 56px;
+    border-radius: 12px;
+    border: 1px dashed #7aa8d9;
+    background: #edf6ff;
+    font-size: 2rem;
+    color: #0d5c96;
+  }
+
+  .scale-note {
+    margin-top: -4px;
+    color: #b42318;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+  }
+
+  .primary-button,
+  .secondary-button {
+    border: none;
+    border-radius: 12px;
+    padding: 11px 18px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .primary-button {
+    background: linear-gradient(180deg, #0d5c96 0%, #0c4d86 100%);
+    color: #ffffff;
+  }
+
+  .primary-button:hover,
+  .primary-button:focus-visible {
+    background: linear-gradient(180deg, #0b4f88 0%, #0a4272 100%);
+  }
+
+  .secondary-button {
+    background: #eef2f7;
+    color: #1f2937;
+    border: 1px solid #d9dde4;
+  }
+
+  .secondary-button.is-delete-mode {
+    background: #fef1f2;
+    border-color: #fca5a5;
+    color: #9f1239;
+  }
+
+  #boardMap {
+    width: 100%;
+    height: 520px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #d8edf7;
+  }
+
+  .result-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-top: 16px;
+  }
+
+  .result-table th,
+  .result-table td {
+    border: 1px solid #d9dde4;
+    padding: 10px 8px;
+    text-align: left;
+    vertical-align: top;
+    word-break: break-word;
+  }
+
+  .result-table th {
+    background: #eff6ff;
+  }
+
+  .result-table td {
+    background: #ffffff;
+  }
+
+  .result-list-empty {
+    margin-top: 8px;
+    color: #4b5563;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  @media (max-width: 900px) {
+    .board-layout {
+      display: block;
+    }
+
+    .board-form-panel,
+    .board-map-panel,
+    .board-results-panel {
+      width: 100%;
+    }
+
+    .board-map-panel {
+      margin-top: 18px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #boardMap {
+      height: 360px;
+    }
+  }
+</style>
+
+<div class="board-page">
+  <div class="board-layout">
+    <aside class="board-form-panel" aria-label="災害情報入力">
+      <h2 class="page-heading">指示発信ボード</h2>
+      <p class="page-subtitle">災害情報を登録して、地図上にアイコンを配置できます。</p>
+
+      <form class="board-form" id="disasterForm">
+        <div class="form-field">
+          <label for="disasterName">災害情報</label>
+          <select id="disasterName" name="disasterName" aria-label="災害情報を選択">
+            <option value="地震">地震</option>
+            <option value="火災">火災</option>
+            <option value="洪水">洪水</option>
+            <option value="津波">津波</option>
+            <option value="土砂災害">土砂災害</option>
+            <option value="避難誘導">避難誘導</option>
+          </select>
+        </div>
+
+        <div class="form-field">
+          <label for="icon">災害アイコン</label>
+          <select id="icon" name="icon" aria-label="災害アイコンを選択">
+            <option value="⚠">⚠</option>
+            <option value="〽">〽</option>
+            <option value="🌊">🌊</option>
+            <option value="🔥">🔥</option>
+            <option value="⛑">⛑</option>
+            <option value="📍">📍</option>
+          </select>
+          <div class="icon-preview" id="iconPreview" aria-live="polite">⚠</div>
+        </div>
+
+        <div class="form-field">
+          <label for="datetime">日時</label>
+          <input id="datetime" name="datetime" type="datetime-local" aria-label="日時を入力" />
+        </div>
+
+        <div class="form-field">
+          <label for="note">事項</label>
+          <textarea id="note" name="note" rows="4" aria-label="事項を入力" placeholder="例: 周辺道路の通行止めが発生しています"></textarea>
+        </div>
+
+        <div class="form-field">
+          <label for="scale">規模</label>
+          <select id="scale" name="scale" aria-label="規模を選択">
+            <option value="">選択してください</option>
+            <option value="小規模">小規模</option>
+            <option value="中規模">中規模</option>
+            <option value="大規模">大規模</option>
+          </select>
+          <div class="scale-note" id="scaleNote" hidden>規模を入力してください</div>
+        </div>
+
+        <div class="button-row">
+          <button type="button" class="primary-button" id="confirmButton">決定</button>
+          <button type="button" class="secondary-button" id="deleteModeButton">削除モード</button>
+        </div>
+      </form>
+    </aside>
+
+    <section class="board-map-panel" aria-label="災害情報マップ">
+      <div id="boardMap" aria-label="災害情報マップ"></div>
+    </section>
+  </div>
+
+  <section class="board-results-panel" aria-label="発信一覧">
+    <h3 style="margin:0;">発信一覧</h3>
+    {% if instructions %}
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>内容</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inst in instructions %}
+            <tr>
+              <td>{{ inst.content }}{% if inst.shelter %}（避難先: {{ inst.shelter }}）{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="result-list-empty">登録されている指示はありません。</p>
+    {% endif %}
+  </section>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const savedMarkers = {{ disaster_markers | tojson | safe }};
+    const scaleSelect = document.getElementById('scale');
+    const scaleNote = document.getElementById('scaleNote');
+    const iconSelect = document.getElementById('icon');
+    const iconPreview = document.getElementById('iconPreview');
+    const disasterNameSelect = document.getElementById('disasterName');
+    const datetimeInput = document.getElementById('datetime');
+    const noteInput = document.getElementById('note');
+    const deleteModeButton = document.getElementById('deleteModeButton');
+    const confirmButton = document.getElementById('confirmButton');
+
+    const initialCenter = [40.8244, 140.7400];
+    const initialZoom = 12;
+    let deleteMode = false;
+    let draftMarker = null;
+
+    const map = L.map('boardMap').setView(initialCenter, initialZoom);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const disasterLayer = L.layerGroup().addTo(map);
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function updateIconPreview() {
+      iconPreview.textContent = iconSelect.value || '⚠';
+    }
+
+    function updateScaleNote() {
+      const scaleSelected = Boolean(scaleSelect.value);
+      scaleNote.hidden = scaleSelected;
+      if (!scaleSelected && draftMarker) {
+        draftMarker.remove();
+        draftMarker = null;
+      }
+      if (scaleSelected) {
+        ensureDraftMarker();
+      }
+    }
+
+    function getScaleColor(scale) {
+      if (scale === '小規模') return '#facc15';
+      if (scale === '中規模') return '#f97316';
+      if (scale === '大規模') return '#ef4444';
+      return '#0d5c96';
+    }
+
+    function getScaleSize(scale) {
+      if (scale === '小規模') return 26;
+      if (scale === '中規模') return 34;
+      if (scale === '大規模') return 50;
+      return 26;
+    }
+
+    function getMarkerSize(scale, zoom) {
+      const baseSize = getScaleSize(scale);
+      const zoomScale = Math.pow(1.12, zoom - initialZoom);
+      return Math.round(baseSize * Math.max(0.65, Math.min(1.6, zoomScale)));
+    }
+
+    function buildDisasterIcon(scale, zoom) {
+      const size = getMarkerSize(scale, zoom);
+      const color = getScaleColor(scale);
+      const html = '<span class="disaster-marker-shape" style="width:' + size + 'px;height:' + size + 'px;background:' + color + ';border-color:' + color + ';"></span>';
+      return L.divIcon({
+        className: 'disaster-marker-icon',
+        html: html,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2]
+      });
+    }
+
+    function buildPopupHtml(marker) {
+      const name = escapeHtml(marker.name || '災害情報');
+      const address = escapeHtml(marker.address || '未取得');
+      const datetime = escapeHtml(marker.datetime || '未入力');
+      const note = escapeHtml(marker.note || '未入力');
+      return '<div style="font-size:0.95rem; line-height:1.5;">' +
+        '<strong>' + name + '</strong><br>' +
+        '住所: ' + address + '<br>' +
+        '日時: ' + datetime + '<br>' +
+        '事項: ' + note +
+        '</div>';
+    }
+
+    function renderSavedMarkers() {
+      disasterLayer.clearLayers();
+
+      if (!Array.isArray(savedMarkers)) {
+        return;
+      }
+
+      savedMarkers.forEach(function (marker) {
+        if (!marker || marker.latitude === undefined || marker.longitude === undefined) {
+          return;
+        }
+
+        const scale = marker.scale || '小規模';
+        const currentIcon = buildDisasterIcon(scale, map.getZoom());
+        const markerLayer = L.marker([marker.latitude, marker.longitude], {
+          icon: currentIcon
+        }).addTo(disasterLayer);
+
+        markerLayer.bindPopup(buildPopupHtml(marker));
+
+        markerLayer.on('click', function () {
+          if (!deleteMode) {
+            markerLayer.openPopup();
+            return;
+          }
+
+          if (!window.confirm('この災害アイコンを削除しますか？')) {
+            return;
+          }
+
+          deleteMarker(marker.id);
+        });
+      });
+    }
+
+    async function reverseGeocode(latlng) {
+      const url = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + latlng.lat + '&lon=' + latlng.lng + '&accept-language=ja&addressdetails=1';
+
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'Accept-Language': 'ja'
+          }
+        });
+
+        if (!response.ok) {
+          return '未取得';
+        }
+
+        const data = await response.json();
+        const address = data && data.address ? data.address : {};
+        const parts = [
+          address.city || address.town || address.village || address.municipality,
+          address.suburb || address.neighbourhood || address.city_district,
+          address.road || address.pedestrian,
+          address.house_number || address.house_name
+        ].filter(Boolean);
+
+        return parts.length ? parts.join(' ') : '未取得';
+      } catch (error) {
+        return '未取得';
+      }
+    }
+
+    function ensureDraftMarker() {
+      if (!scaleSelect.value) {
+        return;
+      }
+
+      if (draftMarker) {
+        draftMarker.setIcon(buildDisasterIcon(scaleSelect.value, map.getZoom()));
+        return;
+      }
+
+      draftMarker = L.marker(map.getCenter(), {
+        draggable: true,
+        icon: buildDisasterIcon(scaleSelect.value, map.getZoom())
+      }).addTo(map);
+
+      draftMarker.on('dragstart', function () {
+        if (!scaleSelect.value) {
+          alert('規模を入力してください');
+          draftMarker.setLatLng(map.getCenter());
+        }
+      });
+
+      draftMarker.on('dragend', async function (event) {
+        const latlng = event.target.getLatLng();
+
+        if (!scaleSelect.value) {
+          alert('規模を入力してください');
+          return;
+        }
+
+        const address = await reverseGeocode(latlng);
+        const payload = {
+          latitude: latlng.lat,
+          longitude: latlng.lng,
+          icon: iconSelect.value || '⚠',
+          name: disasterNameSelect.value || '災害情報',
+          scale: scaleSelect.value,
+          datetime: datetimeInput.value || '',
+          note: noteInput.value || '',
+          address: address
+        };
+
+        try {
+          const response = await fetch('/api/disaster_markers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json().catch(function () {
+            return {};
+          });
+
+          if (!response.ok) {
+            throw new Error(data.error || '保存に失敗しました');
+          }
+
+          savedMarkers.push(data);
+          renderSavedMarkers();
+          ensureDraftMarker();
+        } catch (error) {
+          alert(error.message || '保存に失敗しました');
+        }
+      });
+    }
+
+    async function deleteMarker(markerId) {
+      try {
+        const response = await fetch('/api/disaster_markers', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ id: markerId })
+        });
+
+        const data = await response.json().catch(function () {
+          return {};
+        });
+
+        if (!response.ok) {
+          throw new Error(data.error || '削除に失敗しました');
+        }
+
+        const index = savedMarkers.findIndex(function (marker) {
+          return Number(marker.id) === Number(markerId);
+        });
+
+        if (index >= 0) {
+          savedMarkers.splice(index, 1);
+        }
+
+        renderSavedMarkers();
+      } catch (error) {
+        alert(error.message || '削除に失敗しました');
+      }
+    }
+
+    iconSelect.addEventListener('change', updateIconPreview);
+    scaleSelect.addEventListener('change', updateScaleNote);
+    map.on('zoomend', function () {
+      if (draftMarker) {
+        draftMarker.setIcon(buildDisasterIcon(scaleSelect.value, map.getZoom()));
+      }
+      renderSavedMarkers();
+    });
+
+    confirmButton.addEventListener('click', function () {
+      window.location.href = '/';
+    });
+
+    deleteModeButton.addEventListener('click', function () {
+      deleteMode = !deleteMode;
+      deleteModeButton.classList.toggle('is-delete-mode', deleteMode);
+      deleteModeButton.textContent = deleteMode ? '削除モード解除' : '削除モード';
+    });
+
+    datetimeInput.value = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    updateIconPreview();
+    updateScaleNote();
+    renderSavedMarkers();
+  });
+</script>
 {% endblock %}

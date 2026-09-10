@@ -1,94 +1,707 @@
 {% extends "base.html" %}
 
+{% block title %}防災アプリ{% endblock %}
+
 {% block content %}
 <div class="home-page">
-  <section class="card">
-    <div class="section-title">
-      <span class="title-icon">📍</span>
-      <h2>避難所マップ</h2>
-    </div>
-    <div class="map-wrap">
-      <div id="shelterMap"></div>
-    </div>
-  </section>
+  <div class="home-dashboard">
+    <aside class="left-column">
+      <section class="card alert-card" aria-labelledby="weather-heading">
+        <div class="weather-header">
+          <div class="section-title">
+            <span class="title-icon">⚠️</span>
+            <h2 id="weather-heading">青森市の警報・注意報</h2>
+          </div>
+          <button class="refresh-button" type="button" id="refreshWeather">更新</button>
+        </div>
 
-  <section class="card">
-    <div class="weather-header">
-      <div class="section-title" style="padding-bottom:0;">
-        <span class="title-icon">⛅</span>
-        <h2>青森市 気象警報・注意報</h2>
-      </div>
-      <button class="refresh-button" type="button" id="refreshWeather">⟳ 10分おき自動更新</button>
-    </div>
+        <div id="weatherContent">
+          <p class="loading">読み込み中...</p>
+        </div>
+      </section>
 
-    <div id="weatherContent">
-      <p class="loading">読み込み中...</p>
+      <section class="card instructions-card" aria-labelledby="instruction-heading">
+        <div class="section-title">
+          <span class="title-icon">📣</span>
+          <h2 id="instruction-heading">行政からの指示・該当地区</h2>
+        </div>
+
+        {% if active_instructions %}
+          <ul class="instruction-list">
+            {% for item in active_instructions %}
+              {% set district_label = item.district or item.area or item.shelter or '' %}
+              <li class="instruction-item">
+                <div class="instruction-content">{{ item.content }}</div>
+                {% if district_label %}
+                  <div class="instruction-meta">（該当地区: {{ district_label }}）</div>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted">現在発表されていません。</p>
+        {% endif %}
+      </section>
+
+      <section class="card search-card">
+        <a href="{{ url_for('shelter_search') }}" class="search-button">避難所を検索する</a>
+      </section>
+
+      <section class="card legend-card" aria-labelledby="legend-heading">
+        <div class="section-title">
+          <span class="title-icon">🧭</span>
+          <h2 id="legend-heading">災害情報の凡例</h2>
+        </div>
+
+        <div class="legend-grid">
+          <div class="legend-item">
+            <span class="legend-pin" aria-label="河川洪水" style="--pin-color: #1565c0;"></span>
+            <span>河川洪水</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-pin" aria-label="土砂災害" style="--pin-color: #e65100;"></span>
+            <span>土砂災害</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-pin" aria-label="道路冠水" style="--pin-color: #f9a825;"></span>
+            <span>道路冠水</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-pin" aria-label="道路寸断" style="--pin-color: #c2185b;"></span>
+            <span>道路寸断</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-pin" aria-label="津波" style="--pin-color: #00838f;"></span>
+            <span>津波</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-pin" aria-label="獣害" style="--pin-color: #6a1b9a;"></span>
+            <span>獣害</span>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <div class="right-column">
+      <section class="card map-card" aria-labelledby="map-heading">
+        <div class="section-title map-title">
+          <span class="title-icon">📍</span>
+          <h2 id="map-heading">青森市の現在の状況マップ</h2>
+        </div>
+
+        <div class="map-wrap">
+          <div id="homeMap" aria-label="青森市の災害情報マップ"></div>
+        </div>
+      </section>
     </div>
-  </section>
+  </div>
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+<style>
+  .home-page {
+    margin-top: 8px;
+  }
+
+  .home-dashboard {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+
+  .left-column {
+    flex: 0 0 40%;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .right-column {
+    flex: 1 1 60%;
+  }
+
+  .card {
+    background: #f6f8fb;
+    border: 1px solid #d9dde4;
+    border-radius: 18px;
+    box-shadow: 0 8px 18px rgba(20, 54, 86, 0.08);
+    padding: 22px 20px;
+  }
+
+  .alert-card,
+  .instructions-card,
+  .legend-card,
+  .map-card {
+    border-left: 4px solid #2e6bb1;
+  }
+
+  .weather-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #d9dde4;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    margin: 0;
+  }
+
+  .section-title h2 {
+    margin: 0;
+    font-size: clamp(1.15rem, 1.5vw, 1.6rem);
+    font-weight: 800;
+    color: #0d5c96;
+    line-height: 1.3;
+  }
+
+  .title-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+
+  .refresh-button {
+    border: 1px solid rgba(42, 172, 113, 0.4);
+    background: #e7f9ee;
+    color: #2cac72;
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .loading,
+  .muted {
+    margin: 0;
+    color: #64717d;
+    line-height: 1.6;
+  }
+
+  #weatherContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .weather-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .weather-alert {
+    color: #b42318;
+  }
+
+  .weather-safe {
+    color: #247b5c;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2cac72;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #d52d2d;
+    box-shadow: 0 0 0 4px rgba(213, 45, 45, 0.12);
+    flex-shrink: 0;
+  }
+
+  .weather-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4d5d6d;
+    line-height: 1.5;
+  }
+
+  .weather-row .icon {
+    width: 18px;
+    text-align: center;
+    color: #0d5c96;
+  }
+
+  .instruction-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .instruction-item {
+    border: 1px solid #d9dde4;
+    border-radius: 12px;
+    padding: 14px 12px;
+    background: #ffffff;
+  }
+
+  .instruction-content {
+    color: #1b2a39;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .instruction-meta {
+    margin-top: 6px;
+    color: #4d5d6d;
+    font-size: 0.95rem;
+  }
+
+  .search-card {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .search-button {
+    display: block;
+    width: 100%;
+    background: linear-gradient(180deg, #0d5c96 0%, #0c4d86 100%);
+    color: #ffffff;
+    text-decoration: none;
+    text-align: center;
+    padding: 18px 20px;
+    font-weight: 800;
+    border-radius: 12px;
+    transition: background 0.2s ease;
+  }
+
+  .search-button:hover {
+    background: linear-gradient(180deg, #0a4f88 0%, #0a4271 100%);
+  }
+
+  .legend-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1b2a39;
+    font-weight: 600;
+    padding: 8px 0;
+  }
+
+  .legend-pin {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50% 50% 50% 0;
+    border: 2px solid #ffffff;
+    transform: rotate(-45deg);
+    background: var(--pin-color);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .legend-pin::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.7);
+  }
+
+  .map-card {
+    height: 100%;
+  }
+
+  .map-title {
+    margin-bottom: 14px;
+  }
+
+  .map-wrap {
+    background: linear-gradient(180deg, #dff1f9 0%, #c7e7f4 100%);
+    border-radius: 18px;
+    border: 1px solid rgba(13, 90, 144, 0.14);
+    overflow: hidden;
+    min-height: 500px;
+  }
+
+  #homeMap {
+    width: 100%;
+    height: 500px;
+    background: #d8edf7;
+  }
+
+  .map-pin-icon {
+    background: transparent;
+    border: none;
+  }
+
+  .map-pin-shape {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border-radius: 50% 50% 50% 0;
+    border: 2px solid #ffffff;
+    transform: rotate(-45deg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    position: relative;
+    top: 2px;
+    left: 2px;
+  }
+
+  .map-pin-shape::after {
+    content: "";
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    top: 5px;
+    left: 5px;
+  }
+
+  @media (max-width: 900px) {
+    .home-dashboard {
+      flex-direction: column;
+    }
+
+    .left-column,
+    .right-column {
+      width: 100%;
+      flex: 1 1 auto;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .card {
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .legend-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .map-wrap {
+      min-height: 300px;
+    }
+
+    #homeMap {
+      height: 300px;
+    }
+
+    .weather-header {
+      display: block;
+    }
+
+    .refresh-button {
+      margin-top: 10px;
+    }
+  }
+</style>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const map = L.map('shelterMap').setView([35.3390, 139.4903], 12);
+document.addEventListener('DOMContentLoaded', function () {
+  const weatherContent = document.getElementById('weatherContent');
+  const refreshButton = document.getElementById('refreshWeather');
+  let disasterMarkers = [];
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
+  const map = L.map('homeMap').setView([40.8244, 140.7400], 12);
 
-    const weatherContent = document.getElementById('weatherContent');
-    const refreshButton = document.getElementById('refreshWeather');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
 
-    function updateWeatherWarnings() {
-        fetch('/api/weather_warnings')
-            .then(response => response.json())
-            .then(data => {
-                updateWeatherContent(data);
-            })
-            .catch(error => {
-                console.error('気象情報の更新に失敗しました:', error);
-                weatherContent.innerHTML = '<p class="loading">気象情報の取得に失敗しました</p>';
-            });
-    }
+  const mapLayers = {
+    markers: L.layerGroup().addTo(map),
+    circles: L.layerGroup().addTo(map),
+    disaster: L.layerGroup().addTo(map)
+  };
 
-    function updateWeatherContent(data) {
-        if (data.error) {
-            weatherContent.innerHTML = '<p class="loading">気象情報の取得に失敗しました</p>';
-            return;
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function getPinColor(hazardType) {
+    const colors = {
+      river_flood: '#1565c0',
+      landslide: '#e65100',
+      roadway_flood: '#f9a825',
+      road_blockage: '#c2185b',
+      tsunami: '#00838f',
+      wildlife: '#6a1b9a'
+    };
+
+    return colors[hazardType] || '#0d5c96';
+  }
+
+  function buildPinIcon(color) {
+    return L.divIcon({
+      className: 'map-pin-icon',
+      html: '<span class="map-pin-shape" style="background-color: ' + color + ';" aria-hidden="true"></span>',
+      iconSize: [24, 30],
+      iconAnchor: [12, 30],
+      popupAnchor: [0, -28]
+    });
+  }
+
+  function clearMapLayers() {
+    mapLayers.markers.clearLayers();
+    mapLayers.circles.clearLayers();
+  }
+
+  function renderMapPins(data) {
+    clearMapLayers();
+
+    const items = [];
+
+    if (Array.isArray(data.warnings)) {
+      data.warnings.forEach(function (warning) {
+        if (!warning || !Array.isArray(warning.location) || warning.location.length < 2) {
+          return;
         }
 
-        let warningsHtml = '';
-        if (data.warnings && data.warnings.length > 0) {
-            warningsHtml = '<ul class="weather-list">';
-            data.warnings.forEach(warning => {
-                warningsHtml += `<li>${warning.name}（${warning.status}）</li>`;
-            });
-            warningsHtml += '</ul>';
-        } else {
-            warningsHtml = `
-                <div class="weather-status weather-safe">
-                  <span class="status-badge">✓</span>
-                  <span>現在、警報・注意報は発表されていません</span>
-                </div>
-            `;
+        const lat = Number(warning.location[0]);
+        const lng = Number(warning.location[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return;
         }
 
-        weatherContent.innerHTML = `
-            <div class="weather-status">
-              <span class="status-tick">●</span>
-              <span>${data.area_name || '青森市'}</span>
-            </div>
-            ${warningsHtml}
-            <div class="weather-row"><span class="icon">◌</span><span>データ取得時刻: ${data.last_fetch_time || '更新中...'}</span></div>
-            <div class="weather-row"><span class="icon">◔</span><span>気象庁最終発表: ${data.report_time || '不明'}</span></div>
-        `;
+        items.push({
+          name: warning.name || '警報情報',
+          location: [lat, lng],
+          color: getPinColor(warning.hazard_type || 'river_flood'),
+          reported_at: warning.reported_at || '',
+          damage_status: warning.damage_status || '情報なし',
+          scale: warning.scale || '情報なし',
+          outlook: warning.outlook || '情報なし',
+          radius: warning.coverage && Number(warning.coverage.radius) > 0 ? Number(warning.coverage.radius) : null
+        });
+      });
     }
 
-    refreshButton.addEventListener('click', updateWeatherWarnings);
-    updateWeatherWarnings();
-    setInterval(updateWeatherWarnings, 600000);
+    if (Array.isArray(data.hazards)) {
+      data.hazards.forEach(function (hazard) {
+        if (!hazard || !Array.isArray(hazard.location) || hazard.location.length < 2) {
+          return;
+        }
+
+        const lat = Number(hazard.location[0]);
+        const lng = Number(hazard.location[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return;
+        }
+
+        items.push({
+          name: hazard.name || '災害情報',
+          location: [lat, lng],
+          color: getPinColor(hazard.hazard_type || 'river_flood'),
+          reported_at: hazard.reported_at || '',
+          damage_status: hazard.damage_status || '情報なし',
+          scale: hazard.scale || '情報なし',
+          outlook: hazard.outlook || '情報なし',
+          radius: hazard.coverage && Number(hazard.coverage.radius) > 0 ? Number(hazard.coverage.radius) : null
+        });
+      });
+    }
+
+    items.forEach(function (item) {
+      const marker = L.marker(item.location, {
+        icon: buildPinIcon(item.color)
+      }).addTo(mapLayers.markers);
+
+      marker.bindPopup(
+        '<div style="font-size:0.95rem; line-height:1.5;">' +
+          '<strong>' + escapeHtml(item.name) + '</strong><br>' +
+          '発生時刻: ' + escapeHtml(item.reported_at || '不明') + '<br>' +
+          '地域名: ' + escapeHtml(data.area_name || '青森市') + '<br>' +
+          '現在の被害状況: ' + escapeHtml(item.damage_status) + '<br>' +
+          '災害の規模: ' + escapeHtml(item.scale) + '<br>' +
+          '今後の見通し: ' + escapeHtml(item.outlook) +
+        '</div>'
+      );
+
+      if (item.radius) {
+        L.circle(item.location, {
+          radius: item.radius,
+          color: item.color,
+          fillColor: item.color,
+          fillOpacity: 0.18,
+          weight: 1.5
+        }).addTo(mapLayers.circles);
+      }
+    });
+  }
+
+  function getDisasterScaleColor(scale) {
+    if (scale === '小規模') return '#facc15';
+    if (scale === '中規模') return '#f97316';
+    if (scale === '大規模') return '#ef4444';
+    return '#0d5c96';
+  }
+
+  function getDisasterScaleSize(scale) {
+    if (scale === '小規模') return 26;
+    if (scale === '中規模') return 34;
+    if (scale === '大規模') return 50;
+    return 26;
+  }
+
+  function buildDisasterIcon(scale, zoom) {
+    const baseSize = getDisasterScaleSize(scale);
+    const zoomScale = Math.pow(1.12, zoom - 12);
+    const size = Math.round(baseSize * Math.max(0.65, Math.min(1.6, zoomScale)));
+    const color = getDisasterScaleColor(scale);
+
+    return L.divIcon({
+      className: 'map-disaster-icon',
+      html: '<span class="map-disaster-shape" style="width:' + size + 'px;height:' + size + 'px;background:' + color + ';border-color:' + color + ';" aria-hidden="true"></span>',
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+      popupAnchor: [0, -size / 2]
+    });
+  }
+
+  function renderDisasterMarkers(markers) {
+    mapLayers.disaster.clearLayers();
+
+    if (!Array.isArray(markers)) {
+      return;
+    }
+
+    markers.forEach(function (marker) {
+      if (!marker || marker.latitude === undefined || marker.longitude === undefined) {
+        return;
+      }
+
+      const scale = marker.scale || '小規模';
+      const icon = buildDisasterIcon(scale, map.getZoom());
+      const disasterMarker = L.marker([marker.latitude, marker.longitude], {
+        icon: icon
+      }).addTo(mapLayers.disaster);
+
+      disasterMarker.bindPopup(
+        '<div style="font-size:0.95rem; line-height:1.5;">' +
+          '<strong>' + escapeHtml(marker.name || '災害情報') + '</strong><br>' +
+          '住所: ' + escapeHtml(marker.address || '未取得') + '<br>' +
+          '日時: ' + escapeHtml(marker.datetime || '未入力') + '<br>' +
+          '事項: ' + escapeHtml(marker.note || '未入力') +
+        '</div>'
+      );
+    });
+  }
+
+  function loadDisasterMarkers() {
+    fetch('/api/disaster_markers')
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        disasterMarkers = Array.isArray(data) ? data : [];
+        renderDisasterMarkers(disasterMarkers);
+      })
+      .catch(function (error) {
+        console.error('災害マーカーの取得に失敗しました:', error);
+      });
+  }
+
+  function updateWeatherContent(data) {
+    if (data.error) {
+      weatherContent.innerHTML = '<p class="muted">気象情報の取得に失敗しました。</p>';
+      clearMapLayers();
+      return;
+    }
+
+    renderMapPins(data);
+
+    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+
+    if (warnings.length > 0) {
+      const warningSummary = warnings.map(function (warning) {
+        return (warning.name || '災害情報') + '（' + (warning.status || '発表') + '）';
+      });
+
+      weatherContent.innerHTML = `
+        <div class="weather-status weather-alert">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span>現在、${escapeHtml(warningSummary.join('、'))}が発令中です</span>
+        </div>
+        <div class="weather-row"><span class="icon">◌</span><span>発表時刻: ${escapeHtml(data.report_time || '不明')}</span></div>
+        <div class="weather-row"><span class="icon">◔</span><span>最終取得時刻: ${escapeHtml(data.last_fetch_time || '更新中...')}</span></div>
+      `;
+      return;
+    }
+
+    weatherContent.innerHTML = `
+      <div class="weather-status weather-safe">
+        <span class="status-badge" aria-hidden="true">✓</span>
+        <span>現在、警報・注意報は発表されていません。</span>
+      </div>
+      <div class="weather-row"><span class="icon">◌</span><span>発表時刻: ${escapeHtml(data.report_time || '不明')}</span></div>
+      <div class="weather-row"><span class="icon">◔</span><span>最終取得時刻: ${escapeHtml(data.last_fetch_time || '更新中...')}</span></div>
+    `;
+  }
+
+  function fetchWeatherWarnings() {
+    fetch('/api/weather_warnings')
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        updateWeatherContent(data);
+      })
+      .catch(function (error) {
+        console.error('気象情報の更新に失敗しました:', error);
+        weatherContent.innerHTML = '<p class="muted">気象情報の取得に失敗しました。</p>';
+      });
+  }
+
+  map.on('zoomend', function () {
+    renderDisasterMarkers(disasterMarkers);
+  });
+
+  refreshButton.addEventListener('click', fetchWeatherWarnings);
+  loadDisasterMarkers();
+  fetchWeatherWarnings();
+  setInterval(fetchWeatherWarnings, 600000);
 });
 </script>
 {% endblock %}
