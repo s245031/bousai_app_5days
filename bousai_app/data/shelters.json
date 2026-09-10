@@ -3,25 +3,19 @@
     "id": 1,
     "name": "A",
     "capacity": 10,
-    "current": 8,
-    "lat": 40.824,
-    "lng": 140.7389
+    "current": 8
   },
   {
     "id": 2,
     "name": "B",
     "capacity": 20,
-    "current": 0,
-    "lat": 40.8188,
-    "lng": 140.7473
+    "current": 0
   },
   {
     "id": 3,
     "name": "C",
     "capacity": 15,
-    "current": 4,
-    "lat": 40.8287,
-    "lng": 140.7441
+    "current": 4
   },
   {
     "id": 4,
@@ -30,13 +24,5 @@
     "current": 1,
     "lat": 40.8285,
     "lng": 140.7524
-  },
-  {
-    "id": 5,
-    "name": "ピースウィング",
-    "capacity": 234,
-    "current": 123,
-    "lat": 40.8275,
-    "lng": 140.742
   }
 ]
